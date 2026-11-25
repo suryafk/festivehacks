@@ -49,7 +49,10 @@ export default function Plan({ convId, cfg, notify, demo }: { convId: string | n
       setWaLinked(c.whatsapp);
       if (c.trip?.destination) setTrip((t) => ({ ...t, ...c.trip }));
       const last = [...c.messages].reverse().find((m) => m.payload?.cards?.some((x) => x.type === "plan"));
-      if (last?.payload?.cards) setResult({ text: last.text, lang: "en-IN", cards: last.payload.cards, quickReplies: [], stage: c.stage });
+      // Only restore plans saved by this version of the app; older ones lack the price-outlook fields.
+      const fare = last?.payload?.cards?.find((x) => x.type === "fare");
+      const current = !fare || Array.isArray(fare.advice?.dropProb);
+      if (last?.payload?.cards && current) setResult({ text: last.text, lang: "en-IN", cards: last.payload.cards, quickReplies: [], stage: c.stage });
     }).catch(() => {});
     api.getWatch(convId).then(setWatch).catch(() => {});
   }, [convId]);

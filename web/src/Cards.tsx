@@ -41,8 +41,16 @@ export function FlightPriceCard({ card, watch, judge, onBook, onWatch, onSimulat
   card: Card; watch: FareWatch | null; judge: boolean;
   onBook: () => void; onWatch: () => void; onSimulateDrop: () => void;
 }) {
-  const a = card.advice as FareAdvice;
-  const v = VERDICT[a.verdict];
+  // Tolerate advice saved by older versions (no expected price / drop probability yet).
+  const raw = (card.advice ?? {}) as Partial<FareAdvice>;
+  const a: FareAdvice = {
+    verdict: "book_now", currentFare: 0, bestFare: 0, bestBookBy: "", daysOut: 0, savings: 0, history: [], forecast: [],
+    ...raw,
+    expectedFare: raw.expectedFare ?? raw.currentFare ?? 0,
+    vsExpectedPct: raw.vsExpectedPct ?? 0,
+    dropProb: Array.isArray(raw.dropProb) ? raw.dropProb : [],
+  } as FareAdvice;
+  const v = VERDICT[a.verdict] ?? VERDICT.book_now;
   const why =
     a.verdict === "wait"
       ? `Booking by ${day(a.bestBookBy)} should save about ${rupee(a.savings)}.`

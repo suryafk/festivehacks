@@ -5,6 +5,7 @@ import Plan from "./Plan";
 import CabMates from "./CabMates";
 import Ops from "./Ops";
 import { TraceList } from "./Trace";
+import ErrorBoundary from "./ErrorBoundary";
 
 type Page = "home" | "plan" | "cabmates" | "ops";
 const parseRoute = () => {
@@ -55,10 +56,12 @@ export default function App() {
     <div className="flex min-h-screen flex-col">
       <Nav page={route.page} onNewTrip={fresh} />
       <main className="flex-1">
-        {route.page === "home" && <Landing />}
-        {route.page === "plan" && <Plan key={convId ?? "x"} convId={convId} cfg={cfg} notify={notify} demo={route.demo} />}
-        {route.page === "cabmates" && <CabMates convId={convId} cfg={cfg} notify={notify} tick={tick} />}
-        {route.page === "ops" && <Ops />}
+        <ErrorBoundary resetKey={`${route.page}-${convId}`}>
+          {route.page === "home" && <Landing />}
+          {route.page === "plan" && <Plan key={convId ?? "x"} convId={convId} cfg={cfg} notify={notify} demo={route.demo} />}
+          {route.page === "cabmates" && <CabMates convId={convId} cfg={cfg} notify={notify} tick={tick} />}
+          {route.page === "ops" && <Ops />}
+        </ErrorBoundary>
       </main>
       <Footer cfg={cfg} />
 
