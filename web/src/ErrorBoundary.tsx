@@ -17,13 +17,13 @@ export default class ErrorBoundary extends Component<{ children: ReactNode; rese
     if (!this.state.error) return this.props.children;
     return (
       <div className="mx-auto max-w-xl px-4 py-24 text-center">
-        <div className="text-5xl" aria-hidden>🪔</div>
+        <div className="text-5xl" aria-hidden>🧭</div>
         <h1 className="mt-4 font-display text-3xl font-bold">Something went wrong on this page</h1>
         <p className="mt-2 text-ink/70">This can happen if your browser still holds a trip from an older version of Marg Bandhu. Start a fresh trip and you're good to go.</p>
         <div className="mt-6 flex justify-center gap-3">
           <button
             onClick={() => { store.del("mb.conv"); location.hash = "#/plan"; location.reload(); }}
-            className="rounded-full bg-vermilion px-6 py-3 font-semibold text-white"
+            className="rounded-full bg-brand px-6 py-3 font-semibold text-white"
           >
             Start a fresh trip
           </button>

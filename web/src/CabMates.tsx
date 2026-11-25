@@ -47,16 +47,16 @@ export default function CabMates({ convId, cfg, notify, tick }: { convId: string
     const pts: L.LatLngExpression[] = [[hub.lat, hub.lng], [data.me.lat, data.me.lng]];
     for (const t of data.towns) {
       pts.push([t.lat, t.lng]);
-      L.polyline([[hub.lat, hub.lng], [t.lat, t.lng]], { color: t.compatible ? "#f5a524" : "#a59fb0", weight: t.compatible ? 3 : 2, dashArray: "4 8", opacity: 0.9 }).addTo(g);
+      L.polyline([[hub.lat, hub.lng], [t.lat, t.lng]], { color: t.compatible ? "#5cc8ff" : "#9aa8bb", weight: t.compatible ? 3 : 2, dashArray: "4 8", opacity: 0.9 }).addTo(g);
       const s = 30 + Math.min(4, t.count) * 6;
       L.marker([t.lat, t.lng], {
-        icon: pin(`<div style="width:${s}px;height:${s}px" class="flex items-center justify-center rounded-full border-2 ${t.compatible ? "border-[#f5a524] bg-[#f5a524]/30" : "border-[#a59fb0] bg-white/80"} font-bold text-[#221c2e] shadow">${t.count}</div>`, s),
+        icon: pin(`<div style="width:${s}px;height:${s}px" class="flex items-center justify-center rounded-full border-2 ${t.compatible ? "border-[#5cc8ff] bg-[#5cc8ff]/30" : "border-[#9aa8bb] bg-white/80"} font-bold text-[#10213a] shadow">${t.count}</div>`, s),
       }).bindTooltip(`${t.name}: ${t.count} Marg Bandhu${t.count > 1 ? "s" : ""}${t.compatible ? " on your route" : ""}`, { direction: "top" }).addTo(g);
     }
-    L.polyline([[hub.lat, hub.lng], [data.me.lat, data.me.lng]], { color: "#e2483d", weight: 4 }).addTo(g);
-    L.marker([data.me.lat, data.me.lng], { icon: pin(`<div class="flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-white bg-[#e2483d] text-lg shadow-lg">🏠</div>`, 44), zIndexOffset: 1000 })
+    L.polyline([[hub.lat, hub.lng], [data.me.lat, data.me.lng]], { color: "#1e5bd8", weight: 4 }).addTo(g);
+    L.marker([data.me.lat, data.me.lng], { icon: pin(`<div class="flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-white bg-[#1e5bd8] text-lg shadow-lg">🏠</div>`, 44), zIndexOffset: 1000 })
       .bindTooltip(`You → ${data.me.townName}`, { permanent: true, direction: "right", offset: [18, 0] }).addTo(g);
-    L.marker([hub.lat, hub.lng], { icon: pin(`<div class="flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-white bg-[#1b1530] text-lg text-white shadow-lg">✈</div>`, 44), zIndexOffset: 900 })
+    L.marker([hub.lat, hub.lng], { icon: pin(`<div class="flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-white bg-[#0b1d36] text-lg text-white shadow-lg">✈</div>`, 44), zIndexOffset: 900 })
       .bindTooltip(`${hub.name} airport`, { permanent: true, direction: "bottom", offset: [0, 20] }).addTo(g);
     map.current.invalidateSize();
     map.current.fitBounds(L.latLngBounds(pts), { padding: [48, 48], maxZoom: 9 });
@@ -79,7 +79,7 @@ export default function CabMates({ convId, cfg, notify, tick }: { convId: string
       <div className="mx-auto max-w-3xl px-4 py-20 text-center">
         <p className="font-display text-2xl font-bold">No cab leg yet</p>
         <p className="mt-2 text-ink/70">{err}</p>
-        <a href="#/plan" className="mt-6 inline-flex rounded-full bg-night px-6 py-3 font-semibold text-cream">← Back to planning</a>
+        <a href="#/plan" className="mt-6 inline-flex rounded-full bg-navy px-6 py-3 font-semibold text-paper">← Back to planning</a>
       </div>
     );
 
@@ -92,28 +92,28 @@ export default function CabMates({ convId, cfg, notify, tick }: { convId: string
       <a href="#/plan" className="text-sm font-medium text-muted hover:text-ink">← Back to your plan</a>
       <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vermilion">Cab mates</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">Cab mates</p>
           <h1 className="mt-1 font-display text-4xl font-bold md:text-5xl">
             {!data ? "Finding cab mates…" : matched
-              ? <>You're riding with <span className="text-vermilion">{matched.members.length - 1}</span> Marg Bandhu{matched.members.length === 2 ? "" : "s"}</>
-              : <><span className="text-vermilion">{onRoute.length}</span> Marg Bandhu{onRoute.length === 1 ? "" : "s"} heading your way</>}
+              ? <>You're riding with <span className="text-brand">{matched.members.length - 1}</span> Marg Bandhu{matched.members.length === 2 ? "" : "s"}</>
+              : <><span className="text-brand">{onRoute.length}</span> Marg Bandhu{onRoute.length === 1 ? "" : "s"} heading your way</>}
           </h1>
           {data && <p className="mt-2 text-ink/70">Landing at {data.hub.name} airport within ±{data.windowMin} min of your {time(data.me.arriveAt)} arrival, going towards {data.me.townName}. {others.length ? `${others.length} more are headed elsewhere.` : ""}</p>}
         </div>
         {data && !data.pool && (
-          <button onClick={join} disabled={busy} className="rounded-full bg-vermilion px-6 py-3.5 font-semibold text-white shadow-[0_10px_24px_-10px_rgba(226,72,61,0.8)] disabled:opacity-60">
+          <button onClick={join} disabled={busy} className="rounded-full bg-brand px-6 py-3.5 font-semibold text-white shadow-[0_10px_24px_-10px_rgba(30,91,216,0.8)] disabled:opacity-60">
             🚕 Pool with them: about {rupee(Math.round(data.me.soloFare / Math.max(2, Math.min(4, onRoute.length + 1)) / 10) * 10)} instead of {rupee(data.me.soloFare)}
           </button>
         )}
       </div>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[1.6fr_1fr]">
-        <div className="relative overflow-hidden rounded-3xl border border-ink/10 bg-sand shadow-sm">
+        <div className="relative overflow-hidden rounded-3xl border border-ink/10 bg-mist shadow-sm">
           <div ref={mapEl} className="h-[420px] w-full lg:h-[560px]" role="region" aria-label="Map of Marg Bandhus landing at the same airport and where they are headed" />
           <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-wrap gap-2 rounded-2xl bg-white/90 px-3 py-2 text-xs shadow">
-            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-marigold" />on your route</span>
-            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-[#a59fb0]" />other direction</span>
-            <span className="flex items-center gap-1"><span className="h-1 w-4 rounded bg-vermilion" />your ride</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-sky" />on your route</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-[#9aa8bb]" />other direction</span>
+            <span className="flex items-center gap-1"><span className="h-1 w-4 rounded bg-brand" />your ride</span>
           </div>
         </div>
 
@@ -121,10 +121,10 @@ export default function CabMates({ convId, cfg, notify, tick }: { convId: string
           {matched ? (
             <SplitCard split={matched} me={data?.pool?.request.id} members={matched.members} />
           ) : data?.pool?.request.status === "waiting" ? (
-            <div className="rounded-3xl border-2 border-dashed border-marigold bg-marigold-soft/40 p-5">
-              <div className="flex items-center gap-2 font-semibold"><span className="relative flex h-3 w-3"><span className="absolute h-full w-full animate-ping rounded-full bg-marigold" /><span className="relative h-3 w-3 rounded-full bg-marigold" /></span>Matching you with cab mates…</div>
+            <div className="rounded-3xl border-2 border-dashed border-sky bg-sky-soft/40 p-5">
+              <div className="flex items-center gap-2 font-semibold"><span className="relative flex h-3 w-3"><span className="absolute h-full w-full animate-ping rounded-full bg-sky" /><span className="relative h-3 w-3 rounded-full bg-sky" /></span>Matching you with cab mates…</div>
               <p className="mt-1 text-sm text-ink/70">Our watcher pods check every few seconds. You'll get a notification the moment a group forms.</p>
-              {cfg?.judgeControls && <button onClick={() => convId && api.simulateRider(convId).then(load)} className="mt-3 text-sm font-semibold text-vermilion underline">Demo: simulate another traveller joining</button>}
+              {cfg?.judgeControls && <button onClick={() => convId && api.simulateRider(convId).then(load)} className="mt-3 text-sm font-semibold text-brand underline">Demo: simulate another traveller joining</button>}
             </div>
           ) : null}
 
@@ -133,7 +133,7 @@ export default function CabMates({ convId, cfg, notify, tick }: { convId: string
             <ul className="max-h-[420px] divide-y divide-ink/5 overflow-y-auto">
               {[...onRoute, ...others].sort((a, b) => a.arriveAt - b.arriveAt).map((r) => (
                 <li key={r.id} className="flex items-center gap-3 px-5 py-3">
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-semibold ${r.compatible ? "bg-marigold-soft text-night" : "bg-ink/5 text-ink/50"}`}>{r.name[0]}</span>
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-semibold ${r.compatible ? "bg-sky-soft text-navy" : "bg-ink/5 text-ink/50"}`}>{r.name[0]}</span>
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium">{r.name} <span className="font-normal text-muted">→ {r.townName}</span></div>
                     <div className="text-xs text-muted">lands {time(r.arriveAt)} · {r.dropKm} km</div>

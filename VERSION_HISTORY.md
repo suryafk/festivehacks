@@ -12,6 +12,32 @@ Running log of every change, newest first. Each entry says what changed, how it 
 
 ---
 
+## Merge · 2026-11-25 · `travel-theme` → `main` · not deployed
+- Merged branch `travel-theme` (2 commits, the two "Unreleased" entries below) into `main`. Only `VERSION_HISTORY.md` conflicted: kept both sides, with travel-theme's entries on top as Unreleased, then main's v0.6 deploy record, and the duplicated "fare pointer" heading kept once. All code merged automatically.
+- Verified locally after the merge: `npm test` 20/20, web `tsc` clean + build OK. Browser: the new theme's landing renders; the Plan demo (Bengaluru → Gonda) shows the new result order (Ways to get there → cab mates → Should you book) with the live Google Flights badge; every API request returns 200.
+
+## Unreleased · 2026-11-25 · landing name, result order, more trains · not deployed
+- **Landing:** the name is shown in English only (Hindi "मार्ग बंधु" removed from the hero and footer). The feature cards say "Multilingual · 22 Indian languages", and the fare and cab-mates cards mention replies and alerts in your language.
+- **Plan results order:** Ways to get there → Find cab mates → Should you book (was cab mates → fare → ways). Route notes stay just above the options.
+- **Trains (simulated timetables, both directions):** Bengaluru ⇄ Mumbai, Bengaluru ⇄ Pune, Pune ⇄ Mumbai, Hyderabad ⇄ Jhansi, Jamshedpur (Tatanagar) ⇄ Mumbai. 26 trains in all, some running on set weekdays only.
+  - New seed towns: Jhansi `JHS` (via Gwalior airport, 105 km) and Jamshedpur `TATA` (via Ranchi, 130 km), with Hindi aliases.
+  - The "no train data" note no longer says "UP and Bihar only".
+- **Verified locally:** `npm test` 20/20, web `tsc` clean, and train-only plans for all 10 directions (incl. Hindi "झाँसी से हैदराबाद"). UI to be checked by the owner.
+
+## Unreleased · 2026-11-25 · generic travel theme · not deployed
+- **Why:** the platform is for any trip in India. The festive rush is a feature (and the Ops demo), not the whole identity.
+- **Palette** (`web/src/index.css`): marigold / vermilion / maroon-night are replaced by navy `#0b1d36`, paper `#f6f9fc`, mist, ocean-blue `brand` `#1e5bd8` (actions, headings, kickers), and `sky` `#5cc8ff` (highlight on dark, with navy text). Red `danger` `#d93025` now only marks errors, recording, "dearer" and OOMKilled. Teal `leaf` is kept for good news. Tokens and inline SVG/hex colours were renamed across every page.
+- **Type:** Plus Jakarta Sans for headings (was the Fraunces serif); Mukta for Devanagari (was Tiro).
+- **Decoration:** removed the hanging-lights strip and paper grain; added a faint map grid. The diya is replaced by an SVG route logo (nav, footer, favicon); the error page uses 🧭.
+- **Copy:** hero kicker "Door to door · anywhere in India · 22+ languages"; hero line "A trip across India shouldn't take three apps…"; "Everything between your door and your destination"; Plan page "Where are you headed?"; footer and meta description made generic.
+  - Kept on purpose: the "Built for the festive rush" feature card, festive-rush buffers, the Ops "Surviving Diwali eve" story, and the hackathon name.
+  - The fare card's festival badge is now "📅 Christmas peak season".
+- **Also:**
+  - The landing fare illustration now matches the new history-based card: no forecast line, and the label "cheaper than 65% of the last 60 days".
+  - The fare chart's "today" label is no longer clipped.
+  - A price within 1% of typical reads "about the usual price", not "0% cheaper".
+- **Verified locally:** web `tsc` clean. Screenshots (headless Chromium) of the landing page at desktop and 390 px (no sideways scroll), the Plan page with a live plan (BLR→Gonda), and Ops.
+
 ## v0.6 · 2026-11-25 · `f1227cc` (PR #1 merged) · deployed
 **Deployed from `main` on request.** It contains the three entries below, from PR #1 "any-place-and-fare-prediction".
 - Pre-deploy checks (local, real keys): 20/20 tests; web builds. Bengaluru → Gonda (EN + HI) still plans with live Google Flights (₹7,935). Pune → Ahmedabad (new any-place routing): direct IndiGo, live ₹3,787. Chennai → Darbhanga plans. Nepal → "we only plan trips within India". Browser: the new price card ("today vs the last 7 days", Sarvam-written explanation) renders with the live badge. The new outside call is OpenStreetMap Nominatim (no key, generic User-Agent, 1 req/s, cached). No new env vars required (`SARVAM_EXPLAIN_MODEL` optional). SerpApi: 241 → 240 searches left.

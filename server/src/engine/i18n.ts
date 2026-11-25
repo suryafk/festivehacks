@@ -46,8 +46,8 @@ export const t = {
   samePlace: (l: L) => (l === "hi" ? "शुरुआत और मंज़िल एक ही जगह है। कहाँ से कहाँ जाना है?" : "That's the same place twice. Where from, and where to?"),
   noTrainData: (l: L) =>
     l === "hi"
-      ? "🚆 इस रास्ते की ट्रेन समय-सारणी अभी हमारे पास नहीं है (अभी सिर्फ़ उत्तर प्रदेश और बिहार के कुछ रास्ते)। IRCTC पर ट्रेन देख लीजिए।"
-      : "🚆 We don't have train timetables for this route yet (only some Uttar Pradesh and Bihar routes for now). Check IRCTC for trains.",
+      ? "🚆 इस रास्ते की ट्रेन समय-सारणी अभी हमारे पास नहीं है। IRCTC पर ट्रेन देख लीजिए।"
+      : "🚆 We don't have train timetables for this route yet. Check IRCTC for trains.",
   noFlightsFound: (l: L) =>
     l === "hi" ? "✈️ Google Flights पर इस तारीख को पास के हवाई अड्डों के बीच कोई फ्लाइट नहीं मिली।" : "✈️ Google Flights shows no flights between the nearby airports on this date.",
   coverage: (l: L) =>

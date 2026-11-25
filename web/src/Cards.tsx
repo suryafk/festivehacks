@@ -2,7 +2,7 @@ import { useState } from "react";
 import { city, day, dur, rupee, time, weekday, type Card, type FareAdvice, type FareWatch, type Itinerary, type Split } from "./api";
 
 const ICON: Record<string, string> = { flight: "✈️", train: "🚆", cab: "🚕", transfer: "🚶" };
-const cardCls = "rounded-3xl border border-ink/10 bg-white p-5 shadow-[0_1px_0_rgba(0,0,0,0.03),0_16px_40px_-28px_rgba(27,21,48,0.45)] md:p-6";
+const cardCls = "rounded-3xl border border-ink/10 bg-white p-5 shadow-[0_1px_0_rgba(0,0,0,0.03),0_16px_40px_-28px_rgba(11,29,54,0.45)] md:p-6";
 
 /* ---------------- Flight price prediction ---------------- */
 
@@ -27,21 +27,21 @@ function FareChart({ a }: { a: FareAdvice }) {
       {!live && <text x={P + 2} y={y(a.expectedFare) - 5} fontSize="11" fill="#0f766e">expected {rupee(a.expectedFare)}</text>}
       {lowIdx >= 0 && <circle cx={x(lowIdx)} cy={y(a.history[lowIdx].fare)} r="3.5" fill="#0f766e" />}
       {lowIdx >= 0 && <text x={x(lowIdx)} y={y(a.history[lowIdx].fare) + 15} fontSize="11" textAnchor="middle" fill="#0f766e">lowest {rupee(a.history[lowIdx].fare)}</text>}
-      <path d={path((p) => p.past)} fill="none" stroke="#a59fb0" strokeWidth="2.2" />
-      <path d={path((p) => !p.past)} fill="none" stroke="#e2483d" strokeWidth="2.5" strokeDasharray="6 4" />
-      <line x1={x(ti)} x2={x(ti)} y1={P} y2={H - P} stroke="#1b1530" strokeOpacity="0.4" />
-      <circle cx={x(ti)} cy={y(a.currentFare)} r="5" fill="#1b1530" />
-      <text x={x(ti)} y={H + 14} fontSize="11" textAnchor="middle" fill="#1b1530">today</text>
-      <text x={P} y={H + 14} fontSize="11" fill="#6b6478">{a.history[0] ? `since ${day(a.history[0].date)}` : ""}</text>
-      {!live && <text x={W - P} y={H + 14} fontSize="11" textAnchor="end" fill="#6b6478">travel day</text>}
+      <path d={path((p) => p.past)} fill="none" stroke="#9aa8bb" strokeWidth="2.2" />
+      <path d={path((p) => !p.past)} fill="none" stroke="#1e5bd8" strokeWidth="2.5" strokeDasharray="6 4" />
+      <line x1={x(ti)} x2={x(ti)} y1={P} y2={H - P} stroke="#0b1d36" strokeOpacity="0.4" />
+      <circle cx={x(ti)} cy={y(a.currentFare)} r="5" fill="#0b1d36" />
+      <text x={Math.min(x(ti), W - P)} y={H + 14} fontSize="11" textAnchor={x(ti) > W - 40 ? "end" : "middle"} fill="#0b1d36">today</text>
+      <text x={P} y={H + 14} fontSize="11" fill="#5a6b82">{a.history[0] ? `since ${day(a.history[0].date)}` : ""}</text>
+      {!live && <text x={W - P} y={H + 14} fontSize="11" textAnchor="end" fill="#5a6b82">travel day</text>}
     </svg>
   );
 }
 
 const VERDICT = {
-  book_now: { label: "Book now", tone: "bg-vermilion text-white", line: "Prices only climb from here." },
+  book_now: { label: "Book now", tone: "bg-brand text-white", line: "Prices only climb from here." },
   wait: { label: "Wait a little", tone: "bg-leaf text-white", line: "A cheaper fare is likely soon." },
-  monitor: { label: "Let us watch it", tone: "bg-marigold text-night", line: "There's a real chance it dips. We'll alert you." },
+  monitor: { label: "Let us watch it", tone: "bg-sky text-navy", line: "There's a real chance it dips. We'll alert you." },
 };
 
 export function FlightPriceCard({ card, watch, judge, onBook, onWatch, onSimulateDrop }: {
@@ -80,26 +80,26 @@ export function FlightPriceCard({ card, watch, judge, onBook, onWatch, onSimulat
           {a.source === "google_flights"
             ? <span className="rounded-full bg-leaf-soft px-3 py-1 text-xs font-semibold text-leaf" title={a.fetchedAt ? `Fetched ${new Date(a.fetchedAt).toLocaleString("en-IN")}` : undefined}>● Live · Google Flights</span>
             : <span className="rounded-full bg-ink/5 px-3 py-1 text-xs font-semibold text-muted">Simulated fares</span>}
-          {a.festival && <span className="rounded-full bg-vermilion/10 px-3 py-1 text-xs font-semibold text-vermilion">🪔 {a.festival} surge pricing</span>}
+          {a.festival && <span className="rounded-full bg-sky-soft px-3 py-1 text-xs font-semibold text-navy">📅 {a.festival} peak season</span>}
         </div>
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl bg-night p-4 text-cream">
-          <div className="text-xs uppercase tracking-wider text-cream/60">Best price now</div>
+        <div className="rounded-2xl bg-navy p-4 text-paper">
+          <div className="text-xs uppercase tracking-wider text-paper/60">Best price now</div>
           <div className="mt-1 font-display text-3xl font-bold tabular-nums">{rupee(a.currentFare)}</div>
-          <div className="text-xs text-cream/60">{a.daysOut} days before travel</div>
+          <div className="text-xs text-paper/60">{a.daysOut} days before travel</div>
         </div>
-        <div className="rounded-2xl bg-sand/70 p-4">
+        <div className="rounded-2xl bg-mist/70 p-4">
           <div className="text-xs uppercase tracking-wider text-muted">{a.typicalRange ? "Typical (Google)" : "Expected (history)"}</div>
           <div className="mt-1 font-display text-3xl font-bold tabular-nums">{rupee(a.expectedFare)}</div>
-          <div className={`text-xs font-medium ${a.vsExpectedPct <= 0 ? "text-leaf" : "text-vermilion"}`}>
-            today is {Math.abs(a.vsExpectedPct)}% {a.vsExpectedPct <= 0 ? "cheaper" : "dearer"}
+          <div className={`text-xs font-medium ${a.vsExpectedPct <= 0 ? "text-leaf" : "text-danger"}`}>
+            {Math.abs(a.vsExpectedPct) < 1 ? "today is about the usual price" : `today is ${Math.abs(a.vsExpectedPct)}% ${a.vsExpectedPct < 0 ? "cheaper" : "dearer"}`}
           </div>
           {a.typicalRange && <div className="text-xs text-muted">range {rupee(a.typicalRange[0])}–{rupee(a.typicalRange[1])}{a.priceLevel ? ` · Google says "${a.priceLevel}"` : ""}</div>}
         </div>
         {live && ev ? (
-          <div className="rounded-2xl bg-sand/70 p-4">
+          <div className="rounded-2xl bg-mist/70 p-4">
             <div className="text-xs uppercase tracking-wider text-muted">Today vs the last {ev.days} days</div>
             <div className="mt-1 font-display text-3xl font-bold tabular-nums">{ev.cheaperThanPct}%</div>
             <div className="text-xs text-muted">of days were dearer than today</div>
@@ -111,7 +111,7 @@ export function FlightPriceCard({ card, watch, judge, onBook, onWatch, onSimulat
             {d7 && d7.samples >= 5 && <div className="mt-1 text-xs text-muted">past ≥5% drops within a week: <b className="text-ink">{d7.pct}%</b> of similar days ({d7.samples})</div>}
           </div>
         ) : (
-        <div className="rounded-2xl bg-sand/70 p-4">
+        <div className="rounded-2xl bg-mist/70 p-4">
           <div className="text-xs uppercase tracking-wider text-muted">Chance it drops ≥5%</div>
           <div className="mt-2 space-y-2">
             {a.dropProb.length ? a.dropProb.map((d) => (
@@ -133,17 +133,17 @@ export function FlightPriceCard({ card, watch, judge, onBook, onWatch, onSimulat
           <span className="text-sm text-ink/80">{why}</span>
         </div>
         {watch?.status === "watching" ? (
-          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl bg-marigold-soft/60 px-3 py-2 text-sm">
-            <span className="relative flex h-2.5 w-2.5"><span className="absolute h-full w-full animate-ping rounded-full bg-marigold" /><span className="relative h-2.5 w-2.5 rounded-full bg-marigold" /></span>
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl bg-sky-soft/60 px-3 py-2 text-sm">
+            <span className="relative flex h-2.5 w-2.5"><span className="absolute h-full w-full animate-ping rounded-full bg-sky" /><span className="relative h-2.5 w-2.5 rounded-full bg-sky" /></span>
             Watching {city(watch.origin)}→{city(watch.dest)}. We'll notify you below <b>{rupee(watch.target)}</b> (last check {rupee(watch.last_quote)}).
-            {judge && <button onClick={onSimulateDrop} className="ml-auto text-xs font-semibold text-vermilion underline">Demo: simulate a price drop</button>}
+            {judge && <button onClick={onSimulateDrop} className="ml-auto text-xs font-semibold text-brand underline">Demo: simulate a price drop</button>}
           </div>
         ) : watch?.status === "fired" ? (
           <div className="mt-3 rounded-xl bg-leaf-soft px-3 py-2 text-sm text-leaf">📉 Price dropped to <b>{rupee(watch.last_quote)}</b>, {rupee(watch.start_fare - watch.last_quote)} less than when you started watching.</div>
         ) : null}
         <div className="mt-3 flex flex-wrap gap-2">
-          <button onClick={onBook} className={`rounded-full px-4 py-2 text-sm font-semibold ${a.verdict === "book_now" ? "bg-night text-cream" : "border border-ink/15 bg-white"}`}>Book now at {rupee(a.currentFare)}</button>
-          <button disabled={watch?.status === "watching"} onClick={onWatch} className={`rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50 ${a.verdict !== "book_now" ? "bg-night text-cream" : "border border-ink/15 bg-white"}`}>
+          <button onClick={onBook} className={`rounded-full px-4 py-2 text-sm font-semibold ${a.verdict === "book_now" ? "bg-navy text-paper" : "border border-ink/15 bg-white"}`}>Book now at {rupee(a.currentFare)}</button>
+          <button disabled={watch?.status === "watching"} onClick={onWatch} className={`rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50 ${a.verdict !== "book_now" ? "bg-navy text-paper" : "border border-ink/15 bg-white"}`}>
             🔔 Monitor & notify me when it drops
           </button>
         </div>
@@ -174,14 +174,14 @@ export function Itineraries({ card }: { card: Card }) {
         {its.map((it) => {
           const isOpen = open === it.id;
           return (
-            <div key={it.id} className={`rounded-2xl border transition ${isOpen ? "border-night/70 shadow-sm" : "border-ink/10 hover:border-ink/25"}`}>
+            <div key={it.id} className={`rounded-2xl border transition ${isOpen ? "border-navy/70 shadow-sm" : "border-ink/10 hover:border-ink/25"}`}>
               <button aria-expanded={isOpen} className="flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left" onClick={() => setOpen(isOpen ? undefined : it.id)}>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-lg" aria-hidden>{it.legs.filter((l) => l.mode !== "transfer").map((l) => ICON[l.mode]).join("  ")}</span>
                     <span className="font-semibold">{it.label}</span>
                     {it.tags.filter((t) => ["recommended", "fastest", "cheapest"].includes(t)).map((t) => (
-                      <span key={t} className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${t === "recommended" ? "bg-marigold text-night" : "bg-ink/5 text-ink/70"}`}>{t}</span>
+                      <span key={t} className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${t === "recommended" ? "bg-sky text-navy" : "bg-ink/5 text-ink/70"}`}>{t}</span>
                     ))}
                   </div>
                   <div className="mt-1 text-sm text-muted">{weekday(it.date)} · {time(it.depart)} → {time(it.arrive)}{new Date(it.arrive).getDate() !== new Date(it.depart).getDate() ? " (+1)" : ""}</div>
@@ -218,20 +218,20 @@ export function Itineraries({ card }: { card: Card }) {
 
 export function CabTeaser({ card, onFind }: { card: Card; onFind: () => void }) {
   return (
-    <section className="relative overflow-hidden rounded-3xl bg-night p-6 text-cream">
-      <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-marigold/15 blur-2xl" aria-hidden />
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cream/60">The last mile · from {city(card.hub)} airport</p>
+    <section className="relative overflow-hidden rounded-3xl bg-navy p-6 text-paper">
+      <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-sky/15 blur-2xl" aria-hidden />
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-paper/60">The last mile · from {city(card.hub)} airport</p>
       <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h3 className="font-display text-3xl font-bold">
-            {card.waiting > 0 ? <><span className="text-marigold">{card.waiting}</span> Marg Bandhu{card.waiting > 1 ? "s" : ""} heading your way</> : "Be the first cab mate on this route"}
+            {card.waiting > 0 ? <><span className="text-sky">{card.waiting}</span> Marg Bandhu{card.waiting > 1 ? "s" : ""} heading your way</> : "Be the first cab mate on this route"}
           </h3>
-          <p className="mt-1 text-cream/75">
+          <p className="mt-1 text-paper/75">
             Landing around {time(card.arriveAt)}, going towards {city(card.town)}. A solo cab is {rupee(card.soloFare)}
-            {card.estShare ? <>; shared, your part is about <b className="text-marigold">{rupee(card.estShare)}</b></> : null}.
+            {card.estShare ? <>; shared, your part is about <b className="text-sky">{rupee(card.estShare)}</b></> : null}.
           </p>
         </div>
-        <button onClick={onFind} className="rounded-full bg-marigold px-6 py-3 font-semibold text-night hover:bg-[#ffb43d]">Find cab mates for me →</button>
+        <button onClick={onFind} className="rounded-full bg-sky px-6 py-3 font-semibold text-navy hover:bg-[#8ad8ff]">Find cab mates for me →</button>
       </div>
     </section>
   );
@@ -249,14 +249,14 @@ export function SplitCard({ split, me, members }: { split: Split; me?: string; m
       </div>
       <div className="mt-4 space-y-2">
         {split.lines.map((l) => (
-          <div key={l.riderId} className={`rounded-xl p-3 ${l.riderId === me ? "bg-leaf-soft ring-1 ring-leaf/40" : "bg-sand/50"}`}>
+          <div key={l.riderId} className={`rounded-xl p-3 ${l.riderId === me ? "bg-leaf-soft ring-1 ring-leaf/40" : "bg-mist/50"}`}>
             <div className="flex flex-wrap justify-between gap-2 text-sm">
               <span className="font-semibold">{l.riderId === me ? "You" : l.name} → {city(l.town)} <span className="font-normal text-muted">({l.dropKm} km)</span></span>
               <span className="tabular-nums"><b>{rupee(l.pays)}</b> <span className="text-leaf">saves {rupee(l.saves)}</span></span>
             </div>
             <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-ink/10">
               {l.segments.map((s, i) => (
-                <div key={i} title={`${s.fromKm}–${s.toKm} km shared by ${s.sharedWith}: ${rupee(s.cost)}`} style={{ width: `${((s.toKm - s.fromKm) / maxKm) * 100}%`, opacity: 0.35 + 0.65 / s.sharedWith }} className="border-r border-white bg-marigold" />
+                <div key={i} title={`${s.fromKm}–${s.toKm} km shared by ${s.sharedWith}: ${rupee(s.cost)}`} style={{ width: `${((s.toKm - s.fromKm) / maxKm) * 100}%`, opacity: 0.35 + 0.65 / s.sharedWith }} className="border-r border-white bg-sky" />
               ))}
             </div>
           </div>
