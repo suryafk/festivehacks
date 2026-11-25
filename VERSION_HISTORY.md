@@ -12,6 +12,9 @@ Running log of every change, newest first. Each entry says what changed, how it 
 
 ---
 
+## Docs · 2026-11-25 · `427614c` · no deploy needed
+- Added `CONTEXT.md`: hand-off brief for another Claude (project, working rules, architecture, sponsor integrations with IDs, GCP/k3s infra, code map, API, env var names, features, local-dev gotchas, done vs open items, commands). Checked against `.env.vm`: no secret values included.
+
 ## v0.5 · 2026-11-25 · `e920e1c` · deployed
 **Verified on the live site after deploy:**
 - Nepal/Ahmedabad (web parse + engine) → "माफ़ कीजिए, अहमदाबाद और नेपाल अभी मार्ग बंधु पर उपलब्ध नहीं है…".
