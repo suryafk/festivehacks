@@ -27,6 +27,8 @@ app.setNotFoundHandler((req, reply) => {
 });
 
 await app.listen({ port: config.port, host: "0.0.0.0" });
+const { startFareWatcher } = await import("./engine/fareWatch.ts");
+startFareWatcher();
 
 if (process.env.INLINE_WATCHER === "1") {
   const { runWatcher } = await import("./watcher.ts");

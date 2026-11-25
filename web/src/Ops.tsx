@@ -27,19 +27,19 @@ export default function Ops() {
     try { await fn(); setMsg(ok); } catch (e) { setMsg(String(e)); }
   };
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-4">
-      <div className="rounded-2xl bg-maroon-800 p-5 text-white">
-        <h2 className="text-xl font-bold">Ops · surviving Diwali eve</h2>
-        <p className="mt-1 max-w-3xl text-sm text-marigold-100">
+    <div className="mx-auto max-w-6xl space-y-5 px-4 pb-20 pt-8">
+      <div className="rounded-3xl bg-night p-6 text-cream md:p-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-marigold">Ops</p><h1 className="mt-1 font-display text-4xl font-bold">Surviving Diwali eve</h1>
+        <p className="mt-1 max-w-3xl text-sm text-cream/75">
           Pool watchers run as Kubernetes pods. On the night before a festival, pool requests spike and the watcher pods run out of memory.
           <b> NudgeBee</b> spots the OOMKilled pods, runs an AI root-cause analysis, asks a human to approve, scales the watcher deployment, and flips the
           <b> Flagsmith</b> flag <code className="rounded bg-white/15 px-1">degrade_gracefully</code> so watchers take smaller batches instead of crashing.
         </p>
         {s.flags.judge_controls && (
           <div className="mt-3 flex flex-wrap gap-2">
-            <button onClick={() => run(api.surge, "Surge injected: 1,500 pool requests. Watch the pods.")} className="rounded-lg bg-marigold-500 px-4 py-2 font-semibold text-maroon-900 hover:bg-marigold-300">🎆 Simulate Diwali-eve surge</button>
-            <button onClick={() => run(api.clearSurge, "Surge traffic cleared.")} className="rounded-lg bg-white/10 px-4 py-2 text-sm hover:bg-white/20">Clear surge</button>
-            {msg && <span className="self-center text-sm text-marigold-100">{msg}</span>}
+            <button onClick={() => run(api.surge, "Surge injected: 1,500 pool requests. Watch the pods.")} className="rounded-full bg-marigold px-5 py-2.5 font-semibold text-night hover:bg-[#ffb43d]">🎆 Simulate Diwali-eve surge</button>
+            <button onClick={() => run(api.clearSurge, "Surge traffic cleared.")} className="rounded-full bg-white/10 px-5 py-2.5 text-sm hover:bg-white/20">Clear surge</button>
+            {msg && <span className="self-center text-sm text-cream/75">{msg}</span>}
           </div>
         )}
       </div>
@@ -50,7 +50,7 @@ export default function Ops() {
         <Stat label="degrade_gracefully" value={s.flags.degrade_gracefully ? "ON" : "off"} warn={s.flags.degrade_gracefully} hint={`Flagsmith (${s.flags.source}) · batch ${s.flags.watcher_config.batchSize}`} />
       </div>
       <div className="grid gap-4 md:grid-cols-5">
-        <section className="rounded-2xl border border-stone-200 bg-white p-3 md:col-span-2">
+        <section className="rounded-3xl border border-ink/10 bg-white p-3 md:col-span-2">
           <h3 className="mb-2 font-semibold">Watcher pods</h3>
           {!s.watchers.length && <p className="text-sm text-stone-500">No watcher has checked in yet.</p>}
           <ul className="space-y-1 text-sm">
@@ -62,7 +62,7 @@ export default function Ops() {
             ))}
           </ul>
         </section>
-        <section className="rounded-2xl border border-stone-200 bg-white md:col-span-3">
+        <section className="rounded-3xl border border-ink/10 bg-white md:col-span-3">
           <h3 className="border-b border-stone-100 p-3 font-semibold">Timeline: surge → NudgeBee → Flagsmith</h3>
           <div className="max-h-96 overflow-y-auto"><TraceList items={merged} compact /></div>
         </section>
@@ -73,9 +73,9 @@ export default function Ops() {
 
 function Stat({ label, value, warn, hint }: { label: string; value: string | number; warn?: boolean; hint?: string }) {
   return (
-    <div className={`rounded-2xl border p-4 ${warn ? "border-red-300 bg-red-50" : "border-stone-200 bg-white"}`}>
+    <div className={`rounded-3xl border p-5 ${warn ? "border-red-300 bg-red-50" : "border-ink/10 bg-white"}`}>
       <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">{label}</div>
-      <div className={`mt-1 text-3xl font-bold tabular-nums ${warn ? "text-red-700" : ""}`}>{value}</div>
+      <div className={`mt-1 font-display text-4xl font-bold tabular-nums ${warn ? "text-red-700" : ""}`}>{value}</div>
       {hint && <div className="text-xs text-stone-500">{hint}</div>}
     </div>
   );

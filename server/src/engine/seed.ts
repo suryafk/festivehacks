@@ -123,8 +123,18 @@ export const seedRiders = [
   { name: "Ankit", hub: "LKO", to: "GKP", arriveOffsetMin: 15, dropKm: 275 },
   { name: "Pooja", hub: "LKO", to: "BST", arriveOffsetMin: -35, dropKm: 205 },
   { name: "Imran", hub: "LKO", to: "GD", arriveOffsetMin: 40, dropKm: 125 },
+  { name: "Shalini", hub: "LKO", to: "AY", arriveOffsetMin: -10, dropKm: 135 },
+  { name: "Manoj", hub: "LKO", to: "BRK", arriveOffsetMin: 55, dropKm: 40 },
+  { name: "Ritika", hub: "LKO", to: "GKP", arriveOffsetMin: 95, dropKm: 275 },
+  { name: "Aman", hub: "LKO", to: "SLN", arriveOffsetMin: 25, dropKm: 140 },
+  { name: "Farhan", hub: "LKO", to: "BST", arriveOffsetMin: -120, dropKm: 205 },
   { name: "Neha", hub: "PAT", to: "CPR", arriveOffsetMin: 20, dropKm: 75 },
+  { name: "Saurabh", hub: "PAT", to: "ARA", arriveOffsetMin: -25, dropKm: 60 },
+  { name: "Kajal", hub: "PAT", to: "BGS", arriveOffsetMin: 45, dropKm: 125 },
+  { name: "Vivek", hub: "PAT", to: "HJP", arriveOffsetMin: 10, dropKm: 25 },
   { name: "Rahul", hub: "VNS", to: "JNU", arriveOffsetMin: -20, dropKm: 70 },
+  { name: "Anjali", hub: "VNS", to: "GZP", arriveOffsetMin: 30, dropKm: 80 },
+  { name: "Deepak", hub: "VNS", to: "MZP", arriveOffsetMin: 50, dropKm: 75 },
 ];
 
 export const festivals = [

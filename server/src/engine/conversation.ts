@@ -13,6 +13,7 @@ import { splitFare, compatible } from "./pooling.ts";
 
 export type Action =
   | { type: "set_modes"; modes: Mode[] }
+  | { type: "set_trip"; trip: Trip }
   | { type: "join_pool"; itineraryId?: string }
   | { type: "simulate_rider" }
   | { type: "reset" }
@@ -66,6 +67,7 @@ export async function handle(conv: ConvRow, input: Input): Promise<Reply> {
     out = reply(who ? (l === "hi" ? `(डेमो) ${who} ने आपके रास्ते के लिए पूल जॉइन किया…` : `(demo) ${who} just asked for a pool on your route…`) : "Join a pool first.");
   } else {
     if (a?.type === "set_modes") trip = { ...trip, modes: a.modes };
+    else if (a?.type === "set_trip") trip = sanitizeTrip(a.trip);
     else if (input.text) {
       const intent = await extractIntent(input.text, trip, today, conv.id);
       if (intent.intent === "reset") return handle(conv, { ...input, text: undefined, action: { type: "reset" } });
@@ -157,5 +159,19 @@ export async function turn(conv: ConvRow, input: Input, displayText?: string) {
   if (displayText ?? input.text) messages.add(conv.id, "user", displayText ?? input.text!, input.wasVoice ? { voice: true } : undefined);
   const out = await handle(conv, input);
   messages.add(conv.id, "bot", out.text, { cards: out.cards, quickReplies: out.quickReplies, audioUrl: out.audioUrl, stage: out.stage });
+  return out;
+}
+
+/** Trip submitted from the web form: keep only known fields/values. */
+function sanitizeTrip(x: Trip): Trip {
+  const code = (c?: string) => (c && cityByCode.has(c) ? c : undefined);
+  const out: Trip = {
+    origin: code(x.origin),
+    destination: code(x.destination),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(x.date ?? "") ? x.date : undefined,
+    flexDays: Math.max(0, Math.min(3, Number(x.flexDays ?? 1) || 0)),
+    modes: (x.modes ?? []).filter((m) => ["flight", "train", "cab"].includes(m)) as Mode[],
+    travellers: Math.max(1, Math.min(6, Number(x.travellers ?? 1) || 1)),
+  };
   return out;
 }

@@ -25,6 +25,10 @@ CREATE INDEX IF NOT EXISTS pr_status ON pool_requests(status, claimed_until);
 CREATE TABLE IF NOT EXISTS pools (id TEXT PRIMARY KEY, hub TEXT, split TEXT, created INTEGER);
 CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, kind TEXT, conv_id TEXT, data TEXT);
 CREATE TABLE IF NOT EXISTS heartbeats (pod TEXT PRIMARY KEY, ts INTEGER, data TEXT, first_seen INTEGER);
+CREATE TABLE IF NOT EXISTS fare_watches (
+  id TEXT PRIMARY KEY, conv_id TEXT, origin TEXT, dest TEXT, date TEXT, base_fare INTEGER, start_fare INTEGER,
+  target INTEGER, last_quote INTEGER, status TEXT DEFAULT 'watching', created INTEGER, fired INTEGER
+);
 `);
 
 export const uid = () => randomUUID().slice(0, 12);

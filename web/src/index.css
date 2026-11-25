@@ -1,42 +1,60 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 @theme {
   --font-sans: "Inter", "Mukta", ui-sans-serif, system-ui, sans-serif;
-  --color-marigold-50: #fff8eb;
-  --color-marigold-100: #ffecc6;
-  --color-marigold-300: #ffc65a;
-  --color-marigold-500: #f59e0b;
-  --color-marigold-600: #d97706;
-  --color-maroon-700: #7a1f2b;
-  --color-maroon-800: #5c1620;
-  --color-maroon-900: #3d0e15;
-  --color-ink: #1f1a17;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-deva: "Tiro Devanagari Hindi", "Mukta", serif;
+
+  --color-night: #1b1530;
+  --color-night-2: #2a2147;
+  --color-cream: #fbf6ec;
+  --color-sand: #f2e8d5;
+  --color-ink: #221c2e;
+  --color-muted: #6b6478;
+  --color-marigold: #f5a524;
+  --color-marigold-soft: #fde7b8;
+  --color-vermilion: #e2483d;
+  --color-leaf: #0f766e;
+  --color-leaf-soft: #d5efe9;
 }
 
-:root {
-  color-scheme: light;
-}
+:root { color-scheme: light; }
+html { scroll-behavior: smooth; }
+body { background: var(--color-cream); color: var(--color-ink); -webkit-font-smoothing: antialiased; }
 
-body {
-  background: #fffaf2;
-  color: var(--color-ink);
-}
+.font-display { font-family: var(--font-display); font-optical-sizing: auto; }
+.font-deva { font-family: var(--font-deva); }
 
-.toran {
-  background-image: radial-gradient(circle at 10px -4px, #f59e0b 9px, transparent 10px), radial-gradient(circle at 10px -4px, #dc2626 13px, transparent 14px);
-  background-size: 20px 12px;
-  background-repeat: repeat-x;
-  height: 12px;
-}
+/* subtle paper grain */
+.grain { background-image: radial-gradient(rgba(34, 28, 46, 0.035) 1px, transparent 1px); background-size: 4px 4px; }
 
-@keyframes pop {
-  0% { transform: translateY(8px); opacity: 0; }
-  100% { transform: translateY(0); opacity: 1; }
-}
-.pop { animation: pop 0.25s ease-out; }
+/* hanging lights in the hero */
+.lights { background: radial-gradient(circle, rgba(245, 165, 36, 0.95) 0 2.5px, rgba(245, 165, 36, 0.18) 3px 7px, transparent 8px); background-size: 34px 22px; }
+@keyframes twinkle { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.twinkle { animation: twinkle 3.2s ease-in-out infinite; }
 
-@keyframes pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.5); }
-  100% { box-shadow: 0 0 0 14px rgba(220, 38, 38, 0); }
-}
+@keyframes dash { to { stroke-dashoffset: -40; } }
+.route-dash { stroke-dasharray: 6 8; animation: dash 2.4s linear infinite; }
+
+@keyframes rise { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+.rise { animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(226, 72, 61, 0.5); } 100% { box-shadow: 0 0 0 14px rgba(226, 72, 61, 0); } }
 .recording { animation: pulse-ring 1.2s infinite; }
+
+@keyframes flash { 0% { background: var(--color-marigold-soft); } 100% { background: white; } }
+.filled { animation: flash 1.2s ease-out; }
+
+.deck { scroll-snap-type: x mandatory; scrollbar-width: none; }
+.deck::-webkit-scrollbar { display: none; }
+.deck > * { scroll-snap-align: start; }
+
+/* leaflet tweaks */
+.leaflet-container { font-family: var(--font-sans); background: #efe7d6; }
+.leaflet-tile-pane { filter: grayscale(0.75) sepia(0.25) brightness(1.04) contrast(0.92); }
+.mb-pin { background: none; border: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

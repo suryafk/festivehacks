@@ -40,6 +40,10 @@ export const t = {
         ? `💡 अभी रुकिए: ${fmtDate(a.bestBookBy, l)} तक बुक करने पर लगभग ${rupee(a.savings)} बच सकते हैं।`
         : `💡 Wait a little: booking by ${fmtDate(a.bestBookBy, l)} should save about ${rupee(a.savings)}.`;
     const fest = a.festival ? (l === "hi" ? ` (${a.festival} की भीड़)` : ` (${a.festival} rush)`) : "";
+    if (a.verdict === "monitor")
+      return l === "hi"
+        ? `👀 किराया गिर सकता है${fest}। मैं नज़र रखूँ? गिरते ही सूचना दूँगा।`
+        : `👀 There's a fair chance this fare dips${fest}. Want me to watch it and alert you when it drops?`;
     if (variant === "urgent")
       return l === "hi"
         ? `⏰ अभी बुक करें${fest}: ${a.riseAfter ? fmtDate(a.riseAfter, l) + " के बाद" : "जल्द ही"} किराया तेज़ी से बढ़ेगा।`

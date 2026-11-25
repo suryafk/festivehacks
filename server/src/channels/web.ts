@@ -6,7 +6,13 @@ import { turn, type Input } from "../engine/conversation.ts";
 import { speechToText } from "../integrations/sarvam.ts";
 import { getFlags } from "../integrations/flags.ts";
 import { config, has } from "../config.ts";
-import { poolOf } from "../engine/pools.ts";
+import { poolOf, ensureSeedRiders, waitingNear } from "../engine/pools.ts";
+import { extractIntent } from "../engine/intent.ts";
+import { createWatch, getWatch, simulateDrop } from "../engine/fareWatch.ts";
+import { cityByCode } from "../engine/seed.ts";
+import { compatible } from "../engine/pooling.ts";
+import { rushKnobs } from "../integrations/flags.ts";
+import type { Itinerary, Trip } from "../engine/planner.ts";
 import { t } from "../engine/i18n.ts";
 import { sendWhatsApp } from "../integrations/whatsapp.ts";
 
@@ -96,6 +102,71 @@ export function webRoutes(app: FastifyInstance) {
         .reverse()
         .map((e) => ({ type: "trace", ts: e.ts, kind: e.kind, convId: id, data: j(e.data, {}) }));
     sse(reply, `conv:${id}`, recent);
+  });
+
+  // Plan page: turn a typed / spoken sentence into form fields (Sarvam-105B with heuristic fallback).
+  app.post("/api/conversations/:id/parse", async (req, reply) => {
+    const conv = convs.get((req.params as { id: string }).id);
+    if (!conv) return reply.code(404).send({ error: "not found" });
+    const { text } = (req.body ?? {}) as { text?: string };
+    if (!text?.trim()) return reply.code(400).send({ error: "empty" });
+    const current = j<Trip>(conv.trip, {});
+    const intent = await extractIntent(text.slice(0, 500), current, new Date(), conv.id);
+    return { origin: intent.origin, destination: intent.destination, date: intent.date, flexDays: intent.flexDays, modes: intent.modes, travellers: intent.travellers, lang: intent.lang };
+  });
+
+  // Cab-mates map: who else lands at my hub around my time, and where they're headed.
+  app.get("/api/conversations/:id/cabmates", async (req, reply) => {
+    const conv = convs.get((req.params as { id: string }).id);
+    if (!conv) return reply.code(404).send({ error: "not found" });
+    const its = j<Itinerary[]>(conv.plan, []);
+    const it = its.find((i) => i.pool);
+    if (!it?.pool) return reply.code(409).send({ error: "no cab leg in this plan" });
+    const p = it.pool;
+    const f = await getFlags(conv.user_ref ?? conv.id);
+    const w = { ...f.split_weights, windowMin: rushKnobs(f).poolWindowMin };
+    ensureSeedRiders(p.hub, p.arriveAt);
+    const me = { id: "__me", name: conv.name ?? "You", hub: p.hub, town: p.town, arriveAt: p.arriveAt, dropKm: p.km };
+    const mine = poolOf(conv.id);
+    const riders = waitingNear(p.hub, p.arriveAt, 180)
+      .filter((r) => r.conv_id !== conv.id)
+      .map((r) => {
+        const c = cityByCode.get(r.town)!;
+        const rr = { id: r.id, name: r.name, hub: r.hub, town: r.town, arriveAt: r.arrive_at, dropKm: r.drop_km };
+        return { id: r.id, name: r.name, town: r.town, townName: c.name, lat: c.lat, lng: c.lng, arriveAt: r.arrive_at, dropKm: r.drop_km, compatible: compatible(me, rr, w) };
+      });
+    const hub = cityByCode.get(p.hub)!;
+    const dest = cityByCode.get(p.town)!;
+    const towns = [...new Set(riders.map((r) => r.town))].map((code) => {
+      const c = cityByCode.get(code)!;
+      const list = riders.filter((r) => r.town === code);
+      return { code, name: c.name, lat: c.lat, lng: c.lng, count: list.length, compatible: list.some((r) => r.compatible) };
+    });
+    return {
+      hub: { code: hub.code, name: hub.name, lat: hub.lat, lng: hub.lng },
+      me: { town: dest.code, townName: dest.name, lat: dest.lat, lng: dest.lng, arriveAt: p.arriveAt, km: p.km, soloFare: p.soloFare, itineraryId: it.id },
+      windowMin: w.windowMin,
+      riders,
+      towns,
+      pool: mine,
+    };
+  });
+
+  app.post("/api/conversations/:id/fare-watch", async (req, reply) => {
+    const conv = convs.get((req.params as { id: string }).id);
+    if (!conv) return reply.code(404).send({ error: "not found" });
+    const its = j<Itinerary[]>(conv.plan, []);
+    const fl = its.find((i) => i.flight);
+    if (!fl?.flight) return reply.code(409).send({ error: "no flight in this plan" });
+    const { currentFare } = (req.body ?? {}) as { currentFare?: number };
+    const leg = fl.legs.find((l) => l.mode === "flight");
+    return createWatch(conv.id, fl.flight.from, fl.flight.to, fl.flight.date, fl.flight.baseFare, Number(currentFare) || leg?.fare || fl.flight.baseFare);
+  });
+  app.get("/api/conversations/:id/fare-watch", async (req) => getWatch((req.params as { id: string }).id) ?? null);
+  app.post("/api/conversations/:id/fare-watch/simulate-drop", async (req, reply) => {
+    const f = await getFlags();
+    if (!f.judge_controls) return reply.code(403).send({ error: "judge_controls flag is off" });
+    return { ok: await simulateDrop((req.params as { id: string }).id) };
   });
 
   // A/B test conversion: user tapped the "book" CTA
