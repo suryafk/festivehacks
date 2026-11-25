@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Mukta", ui-sans-serif, system-ui, sans-serif;
+  --color-marigold-50: #fff8eb;
+  --color-marigold-100: #ffecc6;
+  --color-marigold-300: #ffc65a;
+  --color-marigold-500: #f59e0b;
+  --color-marigold-600: #d97706;
+  --color-maroon-700: #7a1f2b;
+  --color-maroon-800: #5c1620;
+  --color-maroon-900: #3d0e15;
+  --color-ink: #1f1a17;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: #fffaf2;
+  color: var(--color-ink);
+}
+
+.toran {
+  background-image: radial-gradient(circle at 10px -4px, #f59e0b 9px, transparent 10px), radial-gradient(circle at 10px -4px, #dc2626 13px, transparent 14px);
+  background-size: 20px 12px;
+  background-repeat: repeat-x;
+  height: 12px;
+}
+
+@keyframes pop {
+  0% { transform: translateY(8px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.pop { animation: pop 0.25s ease-out; }
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.5); }
+  100% { box-shadow: 0 0 0 14px rgba(220, 38, 38, 0); }
+}
+.recording { animation: pulse-ring 1.2s infinite; }

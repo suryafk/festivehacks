@@ -1,0 +1,23 @@
+# Let k3s's bundled Traefik fetch a Let's Encrypt certificate (HTTP-01) so the site is HTTPS.
+# HTTPS is required for the browser microphone and for Twilio to fetch voice replies.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    additionalArguments:
+      - "--certificatesresolvers.le.acme.email=EMAIL_PLACEHOLDER"
+      - "--certificatesresolvers.le.acme.storage=/data/acme.json"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+    persistence:
+      enabled: true
+      path: /data
+    ports:
+      web:
+        redirections:
+          entryPoint:
+            to: websecure
+            scheme: https
+            permanent: true

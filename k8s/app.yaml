@@ -1,0 +1,109 @@
+# Marg Bandhu on k3s. Apply with scripts/deploy.sh (which also creates the secret and sets the host).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: marg-bandhu
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: api-data
+  namespace: marg-bandhu
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: marg-bandhu
+  labels: { app: api }
+spec:
+  replicas: 1 # owns the SQLite database
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: api }
+  template:
+    metadata:
+      labels: { app: api }
+    spec:
+      securityContext: { fsGroup: 1000 }
+      containers:
+        - name: api
+          image: marg-bandhu:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8080 }]
+          envFrom: [{ secretRef: { name: marg-bandhu-env } }]
+          volumeMounts: [{ name: data, mountPath: /data }]
+          readinessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 20 }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: api-data }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: marg-bandhu
+spec:
+  selector: { app: api }
+  ports: [{ port: 8080, targetPort: 8080 }]
+---
+# Pool watchers: stateless, horizontally scalable. The tight memory limit is deliberate: a festive surge
+# makes the matching batch outgrow it (OOMKilled), which is the incident NudgeBee detects and remediates.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pool-watcher
+  namespace: marg-bandhu
+  labels: { app: pool-watcher }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: pool-watcher }
+  template:
+    metadata:
+      labels: { app: pool-watcher }
+    spec:
+      containers:
+        - name: watcher
+          image: marg-bandhu:latest
+          imagePullPolicy: IfNotPresent
+          command: ["node", "--max-old-space-size=512", "src/watcher.ts"]
+          env:
+            - { name: API_URL, value: "http://api:8080" }
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - name: INTERNAL_TOKEN
+              valueFrom: { secretKeyRef: { name: marg-bandhu-env, key: INTERNAL_TOKEN } }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi } # normal batch under surge ≈ 600 MB → OOMKilled; degraded batch ≈ 160 MB → fits
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: marg-bandhu
+  namespace: marg-bandhu
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls.certresolver: le
+spec:
+  tls:
+    - hosts: [HOST_PLACEHOLDER]
+  rules:
+    - host: HOST_PLACEHOLDER
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: api, port: { number: 8080 } }
