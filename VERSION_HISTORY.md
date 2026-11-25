@@ -12,6 +12,10 @@ Running log of every change, newest first. Each entry says what changed, how it 
 
 ---
 
+## Docs · 2026-11-25 · README rewrite · no deploy needed
+- `README.md` rewritten for the submission: problem, features table, how each sponsor is used (Sarvam models, the Flagsmith flag table, the NudgeBee surge → OOMKilled → workflow story), architecture, run locally (offline mode + key table), deploy, 3-minute demo script, honest limitations, repo layout, live links incl. WhatsApp sandbox.
+- Verified from a **fresh clone** of GitHub: web build OK, `npm test` 10/10, `INLINE_WATCHER=1 npm run dev` serves the app (HTTP 200) and plans a Hindi trip offline (PLAN_READY, simulated fares). Checked against `.env.vm`: no secret values.
+
 ## Docs · 2026-11-25 · `427614c` · no deploy needed
 - Added `CONTEXT.md`: hand-off brief for another Claude (project, working rules, architecture, sponsor integrations with IDs, GCP/k3s infra, code map, API, env var names, features, local-dev gotchas, done vs open items, commands). Checked against `.env.vm`: no secret values included.
 
