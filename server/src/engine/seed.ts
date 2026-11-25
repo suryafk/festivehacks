@@ -150,3 +150,16 @@ export function findCity(text: string): City | undefined {
   return cities.find((c) => c.code.toLowerCase() === t || c.aliases.some((a) => a === t)) ??
     cities.find((c) => c.aliases.some((a) => t.includes(a)));
 }
+
+// Well-known places Marg Bandhu does NOT cover yet. Detected without the LLM so the reply is always
+// "not covered yet" instead of a wrong substitution. Name first, then aliases (lower-case / Devanagari).
+export const notCoveredPlaces: [string, ...string[]][] = [
+  ["Ahmedabad", "ahmedabad", "amdavad", "अहमदाबाद"], ["Nepal", "nepal", "नेपाल"], ["Kathmandu", "kathmandu", "काठमांडू"],
+  ["Goa", "goa", "गोवा"], ["Chennai", "chennai", "madras", "चेन्नई"], ["Kolkata", "kolkata", "calcutta", "कोलकाता"],
+  ["Pune", "pune", "पुणे"], ["Jaipur", "jaipur", "जयपुर"], ["Kochi", "kochi", "cochin", "कोच्चि"], ["Chandigarh", "chandigarh", "चंडीगढ़"],
+  ["Bhopal", "bhopal", "भोपाल"], ["Indore", "indore", "इंदौर"], ["Surat", "surat", "सूरत"], ["Nagpur", "nagpur", "नागपुर"],
+  ["Kanpur", "kanpur", "कानपुर"], ["Agra", "agra", "आगरा"], ["Prayagraj", "prayagraj", "allahabad", "प्रयागराज", "इलाहाबाद"],
+  ["Ranchi", "ranchi", "रांची"], ["Darbhanga", "darbhanga", "दरभंगा"], ["Dehradun", "dehradun", "देहरादून"],
+  ["Guwahati", "guwahati", "गुवाहाटी"], ["Bhubaneswar", "bhubaneswar", "भुवनेश्वर"], ["Srinagar", "srinagar", "श्रीनगर"],
+  ["Mysuru", "mysuru", "mysore", "मैसूर"], ["Coimbatore", "coimbatore", "कोयंबटूर"], ["Dubai", "dubai", "दुबई"],
+];

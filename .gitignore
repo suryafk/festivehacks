@@ -9,3 +9,4 @@ server/data/
 
 # GCP service account keys (never commit)
 *-sa-key.json
+server/test/.tmp*/

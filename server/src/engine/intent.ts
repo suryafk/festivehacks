@@ -1,15 +1,19 @@
 // Turn free text (typed or transcribed) into a structured trip update.
 // Primary: Sarvam-105B with a JSON response. Fallback: a deterministic parser, so the demo never dead-ends.
-import { cities, findCity, type Mode } from "./seed.ts";
+import { cities, cityByCode, findCity, notCoveredPlaces, type Mode } from "./seed.ts";
 import type { Trip } from "./planner.ts";
 import { chatJson } from "../integrations/sarvam.ts";
 import { has } from "../config.ts";
 import { trace } from "../bus.ts";
 
 export interface Intent extends Trip {
-  intent: "trip" | "join_pool" | "choose" | "reset" | "help" | "other";
+  intent: "trip" | "join_pool" | "watch_fare" | "choose" | "reset" | "help" | "other";
   choice?: number;
   lang?: string;
+  /** City codes literally present in the user's words (from our alias list). */
+  mentioned?: string[];
+  /** Places the user named that Marg Bandhu doesn't cover yet (e.g. "Nepal", "Ahmedabad"). */
+  unknownPlaces?: string[];
 }
 
 const MONTHS: Record<string, number> = {
@@ -86,7 +90,8 @@ export function parseModes(text: string): Mode[] | undefined {
 export function heuristicIntent(text: string, current: Trip, today: Date): Intent {
   const t = text.toLowerCase().trim();
   const out: Intent = { intent: "trip", lang: detectLang(text) };
-  if (/^(reset|restart|start over|new trip|naya)\b|नया/.test(t)) return { ...out, intent: "reset" };
+  if (/^(reset|restart|start over|new trip|new|naya)\b|नया/.test(t)) return { ...out, intent: "reset" };
+  if (/^(watch|monitor|alert|track)\b|नज़र रख|नजर रख/.test(t)) return { ...out, intent: "watch_fare" };
   if (/^(help|hi|hello|namaste|hey)\b|नमस्ते/.test(t) && t.length < 12) return { ...out, intent: "help" };
   if (/\b(pool|join|share cab|share)\b|शेयर|पूल/.test(t)) return { ...out, intent: "join_pool" };
   const num = t.match(/^\s*(\d)\s*$/);
@@ -101,6 +106,10 @@ export function heuristicIntent(text: string, current: Trip, today: Date): Inten
       if (m && !found.some((f) => f.code === c.code)) found.push({ code: c.code, idx: m.index, kind: c.kind });
     }
   found.sort((a, b) => a.idx - b.idx);
+  out.mentioned = found.map((f) => f.code);
+  const esc = (a: string) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const unknown = notCoveredPlaces.filter(([, ...aliases]) => aliases.some((a) => new RegExp(`(^|[^\\p{L}])${esc(a)}($|[^\\p{L}])`, "u").test(t))).map(([name]) => name);
+  if (unknown.length) out.unknownPlaces = unknown;
   const fromMarker = (code: string) => {
     const c = cities.find((x) => x.code === code)!;
     return [c.code.toLowerCase(), ...c.aliases].some((a) => new RegExp(`(from|frm)\\s+${a}|${a}\\s+(se|से)\\b|${a}\\s+से`).test(t));
@@ -132,28 +141,63 @@ Known city codes: ${cities.map((c) => `${c.code}=${c.name}`).join(", ")}.
 The trip so far: ${JSON.stringify(current)}.
 Return ONLY a JSON object with these keys (omit keys you cannot infer, never invent):
 {"intent":"trip"|"join_pool"|"choose"|"reset"|"help"|"other","origin":CODE,"destination":CODE,"date":"YYYY-MM-DD","flexDays":0-3,
- "modes":["flight"|"train"|"cab"],"travellers":number,"choice":number}
-Rules: dates without a year mean the next upcoming occurrence. "around/aas-paas" means flexDays 2.
-"sab chalega/anything" means all three modes. Only use codes from the list; if a city is not in the list, omit it.`;
+ "modes":["flight"|"train"|"cab"],"travellers":number,"choice":number,"unknown_places":["place name", ...]}
+Rules: dates without a year mean the next upcoming occurrence on or after today (never a past date). "around/aas-paas" means flexDays 2.
+"sab chalega/anything" means all three modes. Only include "modes" if the user actually talks about modes of transport.
+Only use codes from the list. NEVER substitute a different or "nearest" city: if the user names a city, state or country
+that is not in the list (e.g. Nepal, Ahmedabad, Goa), put its name in "unknown_places" and omit origin/destination for it.`;
 
 export async function extractIntent(text: string, current: Trip, today: Date, convId: string | null): Promise<Intent> {
   const heuristic = heuristicIntent(text, current, today);
+  // One-word commands (POOL / WATCH / NEW / "2") are unambiguous: answer instantly without the LLM.
+  if (["reset", "join_pool", "watch_fare", "choose"].includes(heuristic.intent) && text.trim().length <= 24) {
+    trace("engine", convId, { step: "intent", via: "command", result: heuristic.intent });
+    return heuristic;
+  }
   if (!has.sarvam()) {
     trace("engine", convId, { step: "intent", via: "heuristic (no Sarvam key)", result: heuristic });
     return heuristic;
   }
   try {
     const llm = await chatJson<Intent>(SYSTEM(today.toISOString().slice(0, 10), current), text, convId, "extract trip intent");
-    const valid = (c?: string) => (c && findCity(c) ? findCity(c)!.code : undefined);
+    const valid = (c?: string) => (c && cityByCode.has(String(c).toUpperCase()) ? String(c).toUpperCase() : undefined);
+    // Guard against the model "helpfully" swapping in a city the user never said (Nepal → Delhi): accept a city only if
+    // the user's words contain it, or it is already part of the trip being edited.
+    const said = new Set(heuristic.mentioned ?? []);
+    const acceptCity = (c?: string, currentVal?: string) => {
+      const code = valid(c);
+      return code && (said.has(code) || code === currentVal) ? code : undefined;
+    };
+    // Our own list is deterministic and spelled consistently; only fall back to the model's list when ours found nothing.
+    const llmUnknown = (Array.isArray((llm as any).unknown_places) ? (llm as any).unknown_places : []).map(String).filter(Boolean);
+    const unknown = new Set<string>(heuristic.unknownPlaces?.length ? heuristic.unknownPlaces : llmUnknown);
+    if (!heuristic.unknownPlaces?.length) for (const raw of [llm.origin, llm.destination]) if (raw && !valid(raw) && !said.size) unknown.add(String(raw));
+    const todayIso = today.toISOString().slice(0, 10);
+    const okDate = (d?: string) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d >= todayIso ? d : undefined);
     const merged: Intent = {
       ...heuristic,
-      ...Object.fromEntries(Object.entries(llm).filter(([, v]) => v !== null && v !== undefined && v !== "")),
-      origin: valid(llm.origin) ?? heuristic.origin,
-      destination: valid(llm.destination) ?? heuristic.destination,
-      date: /^\d{4}-\d{2}-\d{2}$/.test(llm.date ?? "") ? llm.date : heuristic.date,
-      modes: Array.isArray(llm.modes) && llm.modes.length ? (llm.modes.filter((m) => ["flight", "train", "cab"].includes(m)) as Mode[]) : heuristic.modes,
+      ...Object.fromEntries(Object.entries(llm).filter(([k, v]) => v !== null && v !== undefined && v !== "" && k !== "unknown_places")),
+      origin: acceptCity(llm.origin, current.origin) ?? heuristic.origin,
+      destination: acceptCity(llm.destination, current.destination) ?? heuristic.destination,
+      date: okDate(llm.date) ?? okDate(heuristic.date),
+      // modes only when the user actually talked about them (the model tends to invent them)
+      modes: heuristic.modes ?? (Array.isArray(llm.modes) && llm.modes.length && /mode|transport|साधन|सवारी/i.test(text) ? (llm.modes.filter((m) => ["flight", "train", "cab"].includes(m)) as Mode[]) : undefined),
       lang: heuristic.lang,
+      mentioned: heuristic.mentioned,
+      // Real place names only: the model sometimes adds made-up codes ("NPL"), or echoes a key name ("unknown_places").
+      unknownPlaces: [
+        ...new Map(
+          [...unknown]
+            .map((p) => p.trim())
+            .filter((p) => /^\p{L}[\p{L}\p{M}\s.'-]{2,40}$/u.test(p) && !/^[A-Z]{2,4}$/.test(p) && !/unknown|null|none|n\/a/i.test(p) && !findCity(p))
+            .map((p) => [p.toLowerCase(), p]),
+        ).values(),
+      ],
     };
+    if (llm.origin && !merged.origin && valid(llm.origin)) trace("engine", convId, { step: "intent guard", dropped: { origin: llm.origin }, reason: "not in the user's words" });
+    if (llm.destination && !merged.destination && valid(llm.destination)) trace("engine", convId, { step: "intent guard", dropped: { destination: llm.destination }, reason: "not in the user's words" });
+    if (llm.date && merged.date !== llm.date) trace("engine", convId, { step: "intent guard", dropped: { date: llm.date }, reason: "past or invalid date", used: merged.date });
+    if (merged.origin && merged.origin === merged.destination) merged.destination = heuristic.destination !== merged.origin ? heuristic.destination : undefined;
     if (!merged.intent) merged.intent = "trip";
     return merged;
   } catch (e) {

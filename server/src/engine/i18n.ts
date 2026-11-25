@@ -1,5 +1,5 @@
 // Hand-written English + Hindi replies. Other Indian languages are translated from English with Sarvam Mayura.
-import { cityByCode } from "./seed.ts";
+import { cityByCode, notCoveredPlaces } from "./seed.ts";
 
 type L = "en" | "hi";
 export const langKey = (lang: string): L => (lang.startsWith("hi") ? "hi" : "en");
@@ -27,6 +27,14 @@ export const t = {
   askModes: (l: L) =>
     l === "hi" ? "आप किन साधनों से सफ़र करने में सहज हैं — फ्लाइट, ट्रेन, कैब? (एक से ज़्यादा चुन सकते हैं)" : "Which modes are you comfortable with: flight, train, cab? (pick any)",
   heard: (l: L, text: string) => (l === "hi" ? `🎙️ मैंने सुना: “${text}”` : `🎙️ I heard: “${text}”`),
+  notCovered: (l: L, places: string[]) =>
+    l === "hi"
+      ? `माफ़ कीजिए, ${places.map((p) => notCoveredPlaces.find(([n]) => n === p)?.find((a) => /[\u0900-\u097F]/.test(a)) ?? p).join(" और ")} अभी मार्ग बंधु पर उपलब्ध नहीं है। अभी हम बेंगलुरु, दिल्ली, मुंबई और हैदराबाद से उत्तर प्रदेश और बिहार के शहरों (जैसे लखनऊ, गोरखपुर, गोंडा, अयोध्या, पटना, आरा, वाराणसी, जौनपुर) तक की यात्रा प्लान करते हैं। कहीं और जाना हो तो बताइए!`
+      : `Sorry, ${places.join(" and ")} ${places.length > 1 ? "aren't" : "isn't"} on Marg Bandhu yet. Right now we plan trips from Bengaluru, Delhi, Mumbai and Hyderabad to towns in Uttar Pradesh and Bihar (e.g. Lucknow, Gorakhpur, Gonda, Ayodhya, Patna, Ara, Varanasi, Jaunpur). Want to try one of those?`,
+  coverage: (l: L) =>
+    l === "hi"
+      ? "अभी हम बेंगलुरु, दिल्ली, मुंबई या हैदराबाद से उत्तर प्रदेश और बिहार के शहरों तक की यात्रा प्लान करते हैं। कहाँ से कहाँ जाना है?"
+      : "Right now we plan trips from Bengaluru, Delhi, Mumbai or Hyderabad to towns in Uttar Pradesh and Bihar. Where from, and where to?",
   noRoute: (l: L) => (l === "hi" ? "माफ़ कीजिए, इन साधनों से कोई रास्ता नहीं मिला। कोई और साधन जोड़कर देखें?" : "Sorry, I couldn't find a route with those modes. Want to allow another mode?"),
   planIntro: (l: L, trip: { origin?: string; destination?: string; date?: string }) =>
     l === "hi"

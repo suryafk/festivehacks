@@ -113,7 +113,9 @@ export function webRoutes(app: FastifyInstance) {
     if (!text?.trim()) return reply.code(400).send({ error: "empty" });
     const current = j<Trip>(conv.trip, {});
     const intent = await extractIntent(text.slice(0, 500), current, new Date(), conv.id);
-    return { origin: intent.origin, destination: intent.destination, date: intent.date, flexDays: intent.flexDays, modes: intent.modes, travellers: intent.travellers, lang: intent.lang };
+    const unknownPlaces = intent.unknownPlaces ?? [];
+    const message = unknownPlaces.length ? t.notCovered(intent.lang?.startsWith("hi") ? "hi" : "en", unknownPlaces) : undefined;
+    return { origin: intent.origin, destination: intent.destination, date: intent.date, flexDays: intent.flexDays, modes: intent.modes, travellers: intent.travellers, lang: intent.lang, unknownPlaces, message };
   });
 
   // Cab-mates map: who else lands at my hub around my time, and where they're headed.

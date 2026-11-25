@@ -6,7 +6,8 @@ import { textToSpeech, translate } from "../integrations/sarvam.ts";
 import { extractIntent, detectLang } from "./intent.ts";
 import { plan, type Itinerary, type Trip } from "./planner.ts";
 import { adviseFare } from "./fares.ts";
-import { t, langKey } from "./i18n.ts";
+import { t, langKey, cityName, rupee } from "./i18n.ts";
+import { createWatch } from "./fareWatch.ts";
 import { cityByCode, flights as seedFlights, type Mode } from "./seed.ts";
 import { addSimulatedRider, createRequest, ensureSeedRiders, poolOf, previewCount, waitingNear } from "./pools.ts";
 import { splitFare, compatible } from "./pooling.ts";
@@ -17,6 +18,7 @@ export type Action =
   | { type: "set_trip"; trip: Trip }
   | { type: "join_pool"; itineraryId?: string }
   | { type: "simulate_rider" }
+  | { type: "watch_fare" }
   | { type: "reset" }
   | { type: "track"; event: string };
 
@@ -63,6 +65,8 @@ export async function handle(conv: ConvRow, input: Input): Promise<Reply> {
     out = reply(`${t.reset(l)} ${t.welcome(l)}`, { stage: "NEW" });
   } else if (a?.type === "join_pool") {
     out = await joinPool(conv, a.itineraryId, flags.pooling_enabled, l, reply);
+  } else if (a?.type === "watch_fare") {
+    out = watchFare(conv, l, reply);
   } else if (a?.type === "simulate_rider") {
     const who = addSimulatedRider(conv.id);
     out = reply(who ? (l === "hi" ? `(डेमो) ${who} ने आपके रास्ते के लिए पूल जॉइन किया…` : `(demo) ${who} just asked for a pool on your route…`) : "Join a pool first.");
@@ -73,8 +77,14 @@ export async function handle(conv: ConvRow, input: Input): Promise<Reply> {
       const intent = await extractIntent(input.text, trip, today, conv.id);
       if (intent.intent === "reset") return handle(conv, { ...input, text: undefined, action: { type: "reset" } });
       if (intent.intent === "join_pool") return handle(conv, { ...input, text: undefined, action: { type: "join_pool" } });
+      if (intent.intent === "watch_fare") return handle(conv, { ...input, text: undefined, action: { type: "watch_fare" } });
       if (intent.intent === "help" && !trip.destination) {
         out = reply(t.welcome(l), { quickReplies: ["Bengaluru to Gonda around 26 Dec", "26 दिसंबर के आसपास बेंगलुरु से गोरखपुर"] });
+        return finish(conv, input, out, lang, trip);
+      }
+      if (intent.unknownPlaces?.length) {
+        out = reply(t.notCovered(l, intent.unknownPlaces), { stage: "COLLECTING", quickReplies: ["Bengaluru to Gonda around 26 Dec", "Delhi to Patna 30 Dec"] });
+        trace("engine", conv.id, { step: "not covered", places: intent.unknownPlaces });
         return finish(conv, input, out, lang, trip);
       }
       for (const k of ["origin", "destination", "date", "flexDays", "modes", "travellers"] as const)
@@ -111,6 +121,12 @@ async function nextStep(conv: ConvRow, trip: Trip, flags: Awaited<ReturnType<typ
   if (!trip.origin) return reply(t.askOrigin(l), { stage: "COLLECTING", quickReplies: ["Bengaluru", "Delhi", "Mumbai", "Hyderabad"] });
   if (!trip.date) return reply(t.askDate(l, trip.destination), { stage: "COLLECTING", quickReplies: ["24 Dec", "26 Dec", "30 Dec"] });
   if (!trip.modes?.length) return reply(t.askModes(l), { stage: "COLLECTING", quickReplies: MODE_CHIPS, cards: [{ type: "ask-modes" }] });
+
+  // We plan trips from a metro (where people work) to a hub or home town. Say so instead of blaming the modes.
+  const o = cityByCode.get(trip.origin);
+  const dst = cityByCode.get(trip.destination);
+  if (!o || o.kind !== "metro" || !dst || dst.kind === "metro")
+    return reply(t.coverage(l), { stage: "COLLECTING", quickReplies: ["Bengaluru to Gonda around 26 Dec", "Delhi to Patna 30 Dec"] });
 
   const knobs = rushKnobs(flags);
 
@@ -204,4 +220,21 @@ function sanitizeTrip(x: Trip): Trip {
     travellers: Math.max(1, Math.min(6, Number(x.travellers ?? 1) || 1)),
   };
   return out;
+}
+
+/** "WATCH": alert this conversation when the flight fare in its latest plan drops (web + WhatsApp). */
+function watchFare(conv: ConvRow, l: "en" | "hi", reply: (t: string, e?: Partial<Reply>) => Reply): Reply {
+  const fareCard = messages.list(conv.id).reverse().flatMap((m) => ((m.payload as any)?.cards ?? []) as Card[]).find((c) => c.type === "fare") as any;
+  const its = j<Itinerary[]>(conv.plan, []);
+  const fl = its.find((i) => i.flight)?.flight;
+  if (!fareCard || !fl) return reply(l === "hi" ? "पहले एक यात्रा प्लान कीजिए, फिर मैं किराये पर नज़र रखूँगा।" : "Plan a trip first, then I can watch its fare for you.");
+  const [from, to] = String(fareCard.route).split("→");
+  const w = createWatch(conv.id, from || fl.from, to || fl.to, fl.date, fl.baseFare, fareCard.advice.currentFare);
+  if (!w) return reply("Couldn't start the fare watch.");
+  return reply(
+    l === "hi"
+      ? `👀 ठीक है! ${cityName(w.origin, l)} → ${cityName(w.dest, l)} (${w.date}) का किराया अभी ${rupee(w.start_fare)} है। ${rupee(w.target)} से नीचे जाते ही मैं आपको मैसेज करूँगा।`
+      : `👀 Done! Watching ${cityName(w.origin)} → ${cityName(w.dest)} for ${w.date}. It's ${rupee(w.start_fare)} now; I'll message you as soon as it drops below ${rupee(w.target)}.`,
+    { stage: conv.stage },
+  );
 }

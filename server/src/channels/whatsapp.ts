@@ -7,6 +7,7 @@ import { speechToText } from "../integrations/sarvam.ts";
 import { getFlags } from "../integrations/flags.ts";
 import { trace } from "../bus.ts";
 import { t, langKey } from "../engine/i18n.ts";
+import { formatPlanForWhatsApp } from "./waFormat.ts";
 
 export function whatsappRoutes(app: FastifyInstance) {
   app.post("/webhooks/whatsapp", async (req, reply) => {
@@ -47,6 +48,16 @@ async function processInbound(body: Record<string, string>) {
   const l = langKey(out.lang);
   // Voice path differs slightly: echo what we heard so the user can correct it by just replying.
   const heard = wasVoice ? t.heard(l, text) + "\n\n" : "";
-  const chips = out.quickReplies.length ? `\n\n↪ ${out.quickReplies.join("  ·  ")}` : "";
+
+  // A full plan gets the detailed WhatsApp layout (route, alternatives, price outlook, cab mates, link).
+  const detailed = out.stage === "PLAN_READY" ? formatPlanForWhatsApp(out.cards, out.lang, conv.id) : null;
+  if (detailed?.length) {
+    for (const [i, msg] of detailed.entries()) {
+      // voice note (if any) rides on the first message; messages go out in order
+      await sendWhatsApp(from, (i === 0 ? heard : "") + msg, i === 0 ? out.audioUrl : null, conv.id);
+    }
+    return;
+  }
+  const chips = out.quickReplies.length ? `\n\n↪ ${out.quickReplies.map((q) => (q === "pool" ? "POOL" : q === "reset" ? "NEW" : q)).join("  ·  ")}` : "";
   await sendWhatsApp(from, heard + out.text + chips, out.audioUrl, conv.id);
 }

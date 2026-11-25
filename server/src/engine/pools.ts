@@ -6,6 +6,7 @@ import { splitFare, type Rider, type SplitWeights, compatible } from "./pooling.
 import { t, langKey } from "./i18n.ts";
 import { sendWhatsApp } from "../integrations/whatsapp.ts";
 import { textToSpeech, translate } from "../integrations/sarvam.ts";
+import { formatPoolMatchedForWhatsApp } from "../channels/waFormat.ts";
 
 interface Row {
   id: string;
@@ -110,8 +111,10 @@ async function notifyMatched(me: Row, rows: Row[], split: ReturnType<typeof spli
   convs.update(conv.id, { stage: "POOL_JOINED" });
   pushToConv(conv.id, { type: "message", role: "bot", text, payload: { cards: [card], notify: true }, ts: Date.now() });
   if (conv.whatsapp) {
+    // Detailed version for WhatsApp: who rides, what each person pays and saves, when the cab leaves.
+    const detailed = formatPoolMatchedForWhatsApp(split, me.id, conv.lang, conv.id);
     const audio = conv.channel === "whatsapp" ? await textToSpeech(text, conv.lang, conv.id) : null;
-    await sendWhatsApp(conv.whatsapp, text, audio, conv.id);
+    await sendWhatsApp(conv.whatsapp, detailed, audio, conv.id);
   }
 }
 

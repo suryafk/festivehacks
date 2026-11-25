@@ -79,12 +79,20 @@ export default function Plan({ convId, cfg, notify, demo }: { convId: string | n
     setError(null);
     try {
       const p = await api.parse(convId, text);
+      if (p.unknownPlaces?.length) {
+        setError(p.message ?? `${p.unknownPlaces.join(" and ")} isn't covered yet.`);
+        return;
+      }
       const patch: Trip = {};
       for (const k of ["origin", "destination", "date", "flexDays", "modes", "travellers"] as const) if (p[k] != null) (patch as any)[k] = p[k];
       setTrip((t) => ({ ...t, ...patch }));
       setFlash(Object.keys(patch));
       setTimeout(() => setFlash([]), 1300);
-      if (thenPlan) await generate({ ...trip, ...patch });
+      if (thenPlan) {
+        const next = { ...trip, ...patch };
+        if (!next.destination || !next.date) setError(`Got it so far. Please pick ${!next.destination ? "where you're going" : "a date"} below, then generate the plan.`);
+        else await generate(next);
+      }
     } catch (e) {
       setError(`Couldn't understand that: ${String(e).slice(0, 100)}`);
     } finally {

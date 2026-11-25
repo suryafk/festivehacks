@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ensureConv, newConv, type Config, type Trace } from "./api";
+import { api, ensureConv, newConv, store, type Config, type Trace } from "./api";
 import Landing from "./Landing";
 import Plan from "./Plan";
 import CabMates from "./CabMates";
@@ -27,6 +27,9 @@ export default function App() {
     const on = () => { setRoute(parseRoute()); window.scrollTo({ top: 0 }); };
     addEventListener("hashchange", on);
     api.config().then(setCfg).catch(() => {});
+    // A link from WhatsApp (#/plan?c=<conversation>) opens that same trip here: plan, fare chart, cab-mates map.
+    const linked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("c");
+    if (linked && /^[\w-]{6,40}$/.test(linked)) store.set("mb.conv", linked);
     ensureConv().then(setConvId).catch(() => {});
     return () => removeEventListener("hashchange", on);
   }, []);

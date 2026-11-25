@@ -39,7 +39,7 @@ export const api = {
   get: (id: string) => fetch(`/api/conversations/${id}`).then(json<{ id: string; name: string; stage: string; trip: Trip; messages: Msg[]; whatsapp: boolean }>),
   send: (id: string, body: { text?: string; action?: unknown; wasVoice?: boolean; voiceLang?: string }) => post<Reply>(`/api/conversations/${id}/message`, body),
   plan: (id: string, trip: Trip) => post<Reply>(`/api/conversations/${id}/message`, { action: { type: "set_trip", trip } }),
-  parse: (id: string, text: string) => post<Trip & { lang: string }>(`/api/conversations/${id}/parse`, { text }),
+  parse: (id: string, text: string) => post<Trip & { lang: string; unknownPlaces?: string[]; message?: string }>(`/api/conversations/${id}/parse`, { text }),
   voice: (id: string, blob: Blob) => {
     const f = new FormData();
     f.append("audio", blob, blob.type.includes("ogg") ? "voice.ogg" : "voice.webm");
