@@ -18,6 +18,7 @@ export interface Flags {
   judge_controls: boolean;
   degrade_gracefully: boolean;
   live_fares_enabled: boolean;
+  fare_explainer_enabled: boolean;
   book_nudge_copy: "urgent" | "savings";
   fare_model: FareModel;
   split_weights: SplitWeights;
@@ -33,6 +34,7 @@ export const defaults: Omit<Flags, "source"> = {
   judge_controls: true,
   degrade_gracefully: false,
   live_fares_enabled: true,
+  fare_explainer_enabled: true,
   book_nudge_copy: "urgent",
   fare_model: defaultFareModel,
   split_weights: defaultSplitWeights,
@@ -91,6 +93,7 @@ export async function getFlags(identity?: string, traits: Record<string, string 
         judge_controls: bool("judge_controls"),
         degrade_gracefully: bool("degrade_gracefully"),
         live_fares_enabled: bool("live_fares_enabled"),
+        fare_explainer_enabled: bool("fare_explainer_enabled"),
         book_nudge_copy: copy === "savings" ? "savings" : "urgent",
         fare_model: jsonOr(val("fare_model"), defaults.fare_model),
         split_weights: jsonOr(val("split_weights"), defaults.split_weights),
@@ -113,6 +116,7 @@ export async function getFlags(identity?: string, traits: Record<string, string 
         book_nudge_copy: f.book_nudge_copy,
         degrade_gracefully: f.degrade_gracefully,
         live_fares_enabled: f.live_fares_enabled,
+        fare_explainer_enabled: f.fare_explainer_enabled,
       },
     });
   }

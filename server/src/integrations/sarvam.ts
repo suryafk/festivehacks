@@ -72,16 +72,16 @@ export async function chatJson<T>(system: string, user: string, convId: string |
   return parsed as T;
 }
 
-export async function chatText(system: string, user: string, convId: string | null, purpose: string): Promise<string> {
+export async function chatText(system: string, user: string, convId: string | null, purpose: string, opts: { timeoutMs?: number; maxTokens?: number; temperature?: number; model?: string } = {}): Promise<string> {
   if (!has.sarvam()) throw new Error("SARVAM_API_KEY not set");
   const t0 = performance.now();
   const r = await sarvamFetch("/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: config.sarvam.chatModel, temperature: 0.4, max_tokens: 600, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
-  });
+    body: JSON.stringify({ model: opts.model ?? config.sarvam.chatModel, temperature: opts.temperature ?? 0.4, max_tokens: opts.maxTokens ?? 600, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+  }, opts.timeoutMs);
   const text = String(r.choices?.[0]?.message?.content ?? "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-  trace("sarvam", convId, { api: "chat/completions", model: config.sarvam.chatModel, purpose, ms: Math.round(performance.now() - t0) });
+  trace("sarvam", convId, { api: "chat/completions", model: opts.model ?? config.sarvam.chatModel, purpose, ms: Math.round(performance.now() - t0) });
   return text;
 }
 

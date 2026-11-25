@@ -14,6 +14,8 @@ export const config = {
     apiKey: env.SARVAM_API_KEY ?? "",
     base: "https://api.sarvam.ai",
     chatModel: env.SARVAM_CHAT_MODEL ?? "sarvam-105b",
+    // fare explanations: the chat-tuned variant answers in ~1–3 s; sarvam-105b reasons for ~2,400 tokens (~12 s) first
+    explainModel: env.SARVAM_EXPLAIN_MODEL ?? "sarvam-105b-conversations",
     sttModel: env.SARVAM_STT_MODEL ?? "saaras:v4",
     ttsModel: env.SARVAM_TTS_MODEL ?? "bulbul:v3",
     ttsSpeaker: env.SARVAM_TTS_SPEAKER ?? "",

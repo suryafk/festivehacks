@@ -17,6 +17,7 @@ const flags = [
   { name: "whatsapp_channel_enabled", enabled: true, description: "Kill switch for the WhatsApp channel" },
   { name: "judge_controls", enabled: true, description: "Show demo controls (surge simulator, simulate rider) on the live site" },
   { name: "degrade_gracefully", enabled: false, description: "Flipped ON by NudgeBee during a surge: watchers take small batches at a slower pace" },
+  { name: "fare_explainer_enabled", enabled: true, description: "Sarvam-105B explains the fare pointer in the user's language (numbers checked against the facts; template if not). Off = template text only" },
   { name: "live_fares_enabled", enabled: true, description: "Use live Google Flights fares (SerpApi). Turn off to save the 250/month search quota; falls back to the simulated model" },
   { name: "book_nudge_copy", enabled: true, value: "urgent", description: "A/B test: 'urgent' vs 'savings' copy on the book-now nudge (make it multivariate 50/50)" },
   { name: "fare_model", enabled: true, value: JSON.stringify({ festiveSurgePct: 38, festiveWindowDays: 5, sweetSpotDays: [21, 45], lastMinutePct: 70 }), description: "Remote config for the fare forecast" },

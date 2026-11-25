@@ -16,17 +16,24 @@ function FareChart({ a }: { a: FareAdvice }) {
   const path = (sel: (p: (typeof pts)[number]) => boolean) =>
     pts.map((p, i) => ({ p, i })).filter(({ p }) => sel(p)).map(({ p, i }, k) => `${k ? "L" : "M"}${x(i).toFixed(1)},${y(p.fare).toFixed(1)}`).join(" ");
   const ti = a.history.length;
+  const live = a.method === "history";
+  const band = live && a.typicalRange ? [Math.max(a.typicalRange[0], min), Math.min(a.typicalRange[1], max)] : null;
+  const lowIdx = live && a.evidence ? a.history.findIndex((p) => p.date === a.evidence!.min.date) : -1;
   return (
-    <svg viewBox={`0 0 ${W} ${H + 18}`} className="w-full" role="img" aria-label="Fare for your travel date: last 3 weeks of quotes and our forecast until travel day">
-      <line x1={P} x2={W - P} y1={y(a.expectedFare)} y2={y(a.expectedFare)} stroke="#0f766e" strokeDasharray="3 4" strokeWidth="1.2" />
-      <text x={P + 2} y={y(a.expectedFare) - 5} fontSize="11" fill="#0f766e">expected {rupee(a.expectedFare)}</text>
+    <svg viewBox={`0 0 ${W} ${H + 18}`} className="w-full" role="img" aria-label={live ? "Daily lowest fare for your travel date, from Google Flights, up to today" : "Fare for your travel date: last 3 weeks of quotes and our forecast until travel day"}>
+      {band && band[1] > band[0] && <rect x={P} width={W - 2 * P} y={y(band[1])} height={y(band[0]) - y(band[1])} fill="#0f766e" fillOpacity="0.08" />}
+      {band && <text x={P + 2} y={y(band[1]) + 12} fontSize="11" fill="#0f766e">Google's typical range {rupee(a.typicalRange![0])}–{rupee(a.typicalRange![1])}</text>}
+      {!live && <line x1={P} x2={W - P} y1={y(a.expectedFare)} y2={y(a.expectedFare)} stroke="#0f766e" strokeDasharray="3 4" strokeWidth="1.2" />}
+      {!live && <text x={P + 2} y={y(a.expectedFare) - 5} fontSize="11" fill="#0f766e">expected {rupee(a.expectedFare)}</text>}
+      {lowIdx >= 0 && <circle cx={x(lowIdx)} cy={y(a.history[lowIdx].fare)} r="3.5" fill="#0f766e" />}
+      {lowIdx >= 0 && <text x={x(lowIdx)} y={y(a.history[lowIdx].fare) + 15} fontSize="11" textAnchor="middle" fill="#0f766e">lowest {rupee(a.history[lowIdx].fare)}</text>}
       <path d={path((p) => p.past)} fill="none" stroke="#a59fb0" strokeWidth="2.2" />
       <path d={path((p) => !p.past)} fill="none" stroke="#e2483d" strokeWidth="2.5" strokeDasharray="6 4" />
       <line x1={x(ti)} x2={x(ti)} y1={P} y2={H - P} stroke="#1b1530" strokeOpacity="0.4" />
       <circle cx={x(ti)} cy={y(a.currentFare)} r="5" fill="#1b1530" />
       <text x={x(ti)} y={H + 14} fontSize="11" textAnchor="middle" fill="#1b1530">today</text>
       <text x={P} y={H + 14} fontSize="11" fill="#6b6478">{a.history[0] ? `since ${day(a.history[0].date)}` : ""}</text>
-      <text x={W - P} y={H + 14} fontSize="11" textAnchor="end" fill="#6b6478">travel day</text>
+      {!live && <text x={W - P} y={H + 14} fontSize="11" textAnchor="end" fill="#6b6478">travel day</text>}
     </svg>
   );
 }
@@ -51,7 +58,10 @@ export function FlightPriceCard({ card, watch, judge, onBook, onWatch, onSimulat
     dropProb: Array.isArray(raw.dropProb) ? raw.dropProb : [],
   } as FareAdvice;
   const v = VERDICT[a.verdict] ?? VERDICT.book_now;
-  const why =
+  const live = a.method === "history" && a.evidence;
+  const ev = a.evidence;
+  const d7 = ev?.drop.find((d) => d.days === 7);
+  const why = card.explanation ? String(card.explanation) :
     a.verdict === "wait"
       ? `Booking by ${day(a.bestBookBy)} should save about ${rupee(a.savings)}.`
       : a.verdict === "monitor"
@@ -88,6 +98,19 @@ export function FlightPriceCard({ card, watch, judge, onBook, onWatch, onSimulat
           </div>
           {a.typicalRange && <div className="text-xs text-muted">range {rupee(a.typicalRange[0])}–{rupee(a.typicalRange[1])}{a.priceLevel ? ` · Google says "${a.priceLevel}"` : ""}</div>}
         </div>
+        {live && ev ? (
+          <div className="rounded-2xl bg-sand/70 p-4">
+            <div className="text-xs uppercase tracking-wider text-muted">Today vs the last {ev.days} days</div>
+            <div className="mt-1 font-display text-3xl font-bold tabular-nums">{ev.cheaperThanPct}%</div>
+            <div className="text-xs text-muted">of days were dearer than today</div>
+            <div className="mt-2 h-1.5 rounded-full bg-ink/10"><div className="h-1.5 rounded-full bg-leaf" style={{ width: `${ev.cheaperThanPct}%` }} /></div>
+            <div className="mt-2 text-xs text-muted">
+              lowest {rupee(ev.min.fare)} ({day(ev.min.date)}) · median {rupee(ev.median)}
+              {ev.trendPct !== undefined && <> · this week {ev.trendPct > 0 ? "▲" : ev.trendPct < 0 ? "▼" : "▶"} {Math.abs(ev.trendPct)}%</>}
+            </div>
+            {d7 && d7.samples >= 5 && <div className="mt-1 text-xs text-muted">past ≥5% drops within a week: <b className="text-ink">{d7.pct}%</b> of similar days ({d7.samples})</div>}
+          </div>
+        ) : (
         <div className="rounded-2xl bg-sand/70 p-4">
           <div className="text-xs uppercase tracking-wider text-muted">Chance it drops ≥5%</div>
           <div className="mt-2 space-y-2">
@@ -99,6 +122,7 @@ export function FlightPriceCard({ card, watch, judge, onBook, onWatch, onSimulat
             )) : <div className="text-sm text-muted">Too close to travel</div>}
           </div>
         </div>
+        )}
       </div>
 
       <div className="mt-4"><FareChart a={a} /></div>
@@ -125,9 +149,11 @@ export function FlightPriceCard({ card, watch, judge, onBook, onWatch, onSimulat
         </div>
       </div>
       <p className="mt-3 text-[11px] text-muted">
-        {a.source === "google_flights"
-          ? `Today's price, typical range and price history: Google Flights via SerpApi. Forecast and drop chance: our model, calibrated to that history (daily volatility ${a.volatilityPct ?? "?"}%).`
-          : "Fares and history are simulated for the demo (no live fare feed for this search)."} A/B copy variant: {card.variant} (Flagsmith).
+        {live
+          ? `Every number is from Google Flights' price history for this route and date (via SerpApi); no price is predicted. The pointer follows plain rules on that history${a.backtest?.days ? `; replayed over the last ${a.backtest.days} days of this route it was right ${a.backtest.accuracy}% of the time (always booking at once: ${a.backtest.alwaysBookAccuracy}%)` : ""}.${card.explainedBy === "sarvam" ? " Explanation written by Sarvam-105B from these numbers only." : ""}`
+          : a.source === "google_flights"
+            ? `Today's price, typical range and price history: Google Flights via SerpApi. Forecast and drop chance: our model, calibrated to that history (daily volatility ${a.volatilityPct ?? "?"}%).`
+            : "Fares and history are simulated for the demo (no live fare feed for this search)."} A/B copy variant: {card.variant} (Flagsmith).
       </p>
     </section>
   );

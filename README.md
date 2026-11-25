@@ -27,7 +27,7 @@ From Diwali to New Year, millions of people working in Bengaluru, Delhi, Mumbai 
 |---|---|---|
 | 🗣️ | **Describe the trip by text or voice** in Hindi, English, Hinglish or 20+ Indian languages; it fills the form for you (and asks for whatever is missing) | Web "describe it" bar, WhatsApp |
 | 🧭 | **Door-to-door plan:** flight → train / shared cab, direct trains, ± flexible dates; recommended / fastest / cheapest, with every leg timed | Web, WhatsApp |
-| 📈 | **Flight price outlook:** best price now (**live, Google Flights**), typical range, Google's price level, real price history, chance of a 5%+ drop in 3 and 7 days, and our pointer | Web card, WhatsApp |
+| 📈 | **Flight price outlook from real data:** best price now (**live, Google Flights**), how it compares with the last ~60 days of prices for that route and date, the historical chance of a 5%+ drop within a week, and a book-now / watch-it pointer explained in your language. No made-up forecast, and the rules are backtested on each route's own history | Web card, WhatsApp |
 | 🔔 | **Price watch:** "monitor & notify me", with an alert on the web and WhatsApp when it drops | Web, WhatsApp `WATCH` |
 | 🚕 | **Cab mates map:** who lands at your airport around your time, where they're headed, and on your route or not | Web `#/cabmates` |
 | ⚖️ | **Pool + fair split:** watcher pods match a group in seconds; each person's share is shown stretch by stretch | Web, WhatsApp `POOL` |
@@ -44,6 +44,7 @@ Places outside the current network (e.g. Nepal, Ahmedabad, Goa) get an honest *"
 - **Sarvam-105B** (chat, JSON mode) extracts the trip (origin, destination, date, flexibility, modes) from free text. Guards reject anything the user didn't actually say: no swapped cities, no past dates, no invented modes.
 - **Bulbul v3** (text-to-speech) speaks the plan back in the user's language.
 - **Mayura** (translation) handles reply languages beyond Hindi and English.
+- **Sarvam-105B (conversations)** explains the fare pointer in two sentences in the user's language. It only joins ready-made phrases built from the price history; any text with a number that isn't in them, or a guess about future prices, is rejected and a written template is used instead.
 - Replies come from templates filled with real plan data, so the model never invents flights or prices.
 
 ### Flagsmith: the festive control panel
@@ -54,6 +55,7 @@ Places outside the current network (e.g. Nepal, Ahmedabad, Goa) get an honest *"
 | `book_nudge_copy` | **A/B test** of the "book now" message (`urgent` vs `savings`); clicks on Book are tracked |
 | `fare_model`, `split_weights`, `watcher_config` | **Remote config** for the fare model, pool matching / fare split, and watcher batch size |
 | `live_fares_enabled` | Kill switch for live Google Flights (protects the API quota) |
+| `fare_explainer_enabled` | Sarvam writes the fare explanation (off = written template only) |
 | `voice_input_enabled`, `whatsapp_channel_enabled`, `judge_controls` | Kill switches |
 | `degrade_gracefully` | **Flipped by NudgeBee during a surge:** watchers take 10× smaller batches at half the pace |
 

@@ -8,6 +8,9 @@ export interface FareAdvice {
   currentFare: number; expectedFare: number; vsExpectedPct: number; dropProb: { days: number; pct: number }[];
   bestFare: number; bestBookBy: string; daysOut: number; festival?: string; savings: number; riseAfter?: string;
   source?: "google_flights" | "simulated"; priceLevel?: string; typicalRange?: [number, number]; volatilityPct?: number; fetchedAt?: number;
+  method?: "history" | "model"; reason?: string;
+  evidence?: { days: number; since?: string; median: number; min: { date: string; fare: number }; max: { date: string; fare: number }; cheaperThanPct: number; trendPct?: number; drop: { days: number; pct: number; samples: number; medianSavePct?: number }[] };
+  backtest?: { days: number; accuracy: number; alwaysBookAccuracy: number; monitorCalls: number; monitorRight: number };
   history: { date: string; fare: number }[]; forecast: { date: string; fare: number }[];
 }
 export interface SplitLine { riderId: string; name: string; town: string; dropKm: number; pays: number; soloFare: number; saves: number; segments: { fromKm: number; toKm: number; sharedWith: number; cost: number }[] }

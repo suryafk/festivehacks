@@ -44,7 +44,9 @@ Owner preferences seen so far: wants a plan/walk-through before code for new ide
    ┌──────────── conversation engine (server/src/engine/conversation.ts) ─────────────┐
    │ intent.ts   Sarvam-105B JSON extraction + deterministic heuristic + guards       │
    │ planner.ts  multi-leg itineraries (flight → train / cab, direct trains)          │
-   │ fares.ts    price outlook: live Google data or simulated model, Monte Carlo     │
+   │ fares.ts    price outlook: live → fareStats (history), else simulated model    │
+   │ fareStats.ts evidence + rules + backtest from a real price history            │
+   │ fareExplain.ts Sarvam explanation (checked) or written template, en/hi        │
    │ pooling.ts  match riders + segment-sharing fair split                           │
    │ pools.ts    pool requests, leasing to watchers, results, notifications          │
    │ fareWatch.ts price-drop alerts (30 s re-quotes, simulated)                      │
@@ -91,6 +93,7 @@ Owner preferences seen so far: wants a plan/walk-through before code for new ide
 | `judge_controls` | bool | Demo buttons (surge simulator, simulate rider, simulate price drop) |
 | `degrade_gracefully` | bool | Watchers use batch/10 and interval×2; **feature id 303424**; flipped by NudgeBee; left OFF |
 | `live_fares_enabled` | bool | Use SerpApi; **feature id 303454** |
+| `fare_explainer_enabled` | bool | Sarvam explains the fare pointer (else written template). **Not created in Flagsmith yet**: run `scripts/flagsmith-setup.mjs`. Until then the app uses its default (on); the SDK reports a missing flag as `false`, so `flags.ts` now checks that a flag exists before reading it |
 | `book_nudge_copy` | string `urgent`/`savings` | A/B copy on the price pointer (meant to be multivariate 50/50; **check whether the owner set that up in the UI**) |
 | `fare_model` | JSON | festiveSurgePct, festiveWindowDays, sweetSpotDays, lastMinutePct, volatilityPct |
 | `split_weights` | JSON | maxRiders, windowMin, corridorDeg, detourKmPerStop |
@@ -160,7 +163,7 @@ web/src/
   App.tsx              shell, hash routing (#/, #/plan, #/cabmates, #/ops), SSE notifications/toasts, Behind-the-scenes drawer, ErrorBoundary; ?c= deep link
   Landing.tsx          hero + animated route SVG, sliding feature deck (5 cards, autoplay), how-it-works, CTA
   Plan.tsx             "describe it" bar (text/voice → /parse fills the form), form (from/to/date/flex/modes), results
-  Cards.tsx            FlightPriceCard (best now / typical / drop chance / chart / pointer / watch), Itineraries, CabTeaser, SplitCard
+  Cards.tsx            FlightPriceCard (best now / typical / today-vs-history or drop chance / history chart with Google's typical band / explained pointer / watch), Itineraries, CabTeaser, SplitCard
   CabMates.tsx         Leaflet map of travellers by destination, rider list, join pool, split
   Ops.tsx              surge simulator, watcher pods, timeline (NudgeBee/Flagsmith/pool events)
   Trace.tsx, ErrorBoundary.tsx, api.ts (API client, city lists, formatters)
@@ -183,13 +186,16 @@ Dockerfile             multi-stage: build web → node:24-slim + ffmpeg, runs as
 - **Coverage:** origins are metros (BLR, DEL, BOM, HYD); destinations are hubs (LKO, PAT, VNS) and towns (GKP, GD, BST, AY, BRK, SLN, ARA, HJP, BGS, CPR, JNU, GZP, MZP). Anything else → "not covered yet" (or a coverage message for metro→metro).
 - **Planner:** builds Direct flight, Flight + train (airport→station transfer + buffer), Flight + cab (poolable), Direct train, Train + train, across date ± flex. Score = fare + ₹250/hour + penalties (late arrival, off-date). Keeps the best of each kind, top 4, with recommended/fastest/cheapest tags.
 
-**Flight price outlook (`fares.ts`).**
-- **Live** (Google): best now = Google's lowest; expected = midpoint of Google's typical range; history = Google's price history; volatility = std of daily % changes (clamped 2–15%).
-- **Simulated:** base fare × festive surge × lead-time curve × deterministic noise.
-- The forecast keeps the model's shape, anchored to today's price.
-- Drop chance = Monte Carlo (600 paths) of a ≥5% dip within 3/7 days.
-- Pointer: Google "low" → book now; meaningful saving within 10 days (not festival week) → wait; drop chance ≥25% or Google "high", and >10 days out → monitor.
-- The card shows a "Live · Google Flights" or "Simulated fares" badge.
+**Flight price outlook (`fares.ts`, `fareStats.ts`, `fareExplain.ts`).**
+- **Live (method "history")**, used whenever Google returns ≥7 days of price history. Every number comes from that history: no forecast curve is drawn.
+  - **History:** Google's ~60 days of daily lowest fares for this route + travel date, merged with our own store `fare_obs` (every live search adds a point), so it grows over time. Spikes (>2.5× or <0.35× the median) are dropped.
+  - **Evidence:** share of past days dearer than today, min / median, last-7 vs previous-7-days trend, and a **historical drop chance**: on past days priced like today (similarity-weighted, half-life 3 weeks), how often the fare fell ≥5% within 3 / 7 days.
+  - **Rules, first match wins:** Google "low" → book; cheaper than ≥80% of days → book; ≤14 days out → book; festival and ≤21 days → book; ≥40% historical 7-day drop chance (≥10 samples) → watch; Google "high" and >21 days → watch; rising ≥3% → book; else book.
+  - **Self-check:** "watch" is withdrawn if, on this route's own history, the rules' "watch" calls were right <50% of the time (`waiting_didnt_pay`).
+  - **Explanation:** `sarvam-105b-conversations` (`SARVAM_EXPLAIN_MODEL`) joins ready-made phrases (en/hi) into ≤2 sentences, waiting at most 4.5 s. The text is rejected if it has a number not in the phrases, a forecast word, or the wrong script; the written template is used instead. Results are cached by facts. `sarvam-105b` itself thinks for ~2,400 tokens (~12 s) first, too slow here. Flag `fare_explainer_enabled`.
+  - **Backtest:** `node scripts/backtest-fares.mts [db]`. On the 3 routes stored on 25 Nov (90 route-days): rules right 54% vs always-book 56%. There's a clear edge only where drops really happen (BLR→LKO 58% vs 39%, 8 of 10 "watch" calls right); on a flat fare (DEL→IXC) "watch" was always wrong, which the self-check guards against in the app.
+- **Simulated (method "model")**, no live data: base fare × festive surge × lead-time curve × noise; Monte Carlo drop chance; book / wait / monitor as before. Badge "Simulated fares".
+- The card shows a "Live · Google Flights" or "Simulated fares" badge, and for live data the backtest result in the footnote.
 
 **Price watch.** Re-quotes every 30 s with the simulated model plus jitter (deliberately not SerpApi, to save quota). Alerts at −5% via SSE toast + WhatsApp. There's a judge button to simulate a drop. WhatsApp command **WATCH**.
 

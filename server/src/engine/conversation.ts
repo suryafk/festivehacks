@@ -6,6 +6,7 @@ import { textToSpeech, translate } from "../integrations/sarvam.ts";
 import { extractIntent, detectLang } from "./intent.ts";
 import { plan, airportFor, routeFor, type Itinerary, type Trip } from "./planner.ts";
 import { adviseFare } from "./fares.ts";
+import { explainFare } from "./fareExplain.ts";
 import { t, langKey, cityName, rupee } from "./i18n.ts";
 import { createWatch } from "./fareWatch.ts";
 import { cityByCode, type Mode } from "./seed.ts";
@@ -211,9 +212,17 @@ async function nextStep(conv: ConvRow, trip: Trip, flags: Awaited<ReturnType<typ
     const advice = adviseFare(fl.baseFare, fl.date, today, flags.fare_model, `${fl.from}${fl.to}`, useLive
       ? { lowestPrice: lowest, priceLevel: liveFares!.insights.priceLevel, typicalRange: liveFares!.insights.typicalRange, history: liveFares!.insights.history, fetchedAt: liveFares!.fetchedAt }
       : undefined);
-    cards.push({ type: "fare", advice, variant: flags.book_nudge_copy, route: `${fl.from}→${fl.to}` });
-    lines.push(t.nudge(l, flags.book_nudge_copy, advice));
-    trace("engine", conv.id, { step: "fare advice", source: advice.source, verdict: advice.verdict, currentFare: advice.currentFare, expected: advice.expectedFare, volatilityPct: advice.volatilityPct, abVariant: flags.book_nudge_copy });
+    // Live fares: the pointer comes from the real price history, explained in the user's language (Sarvam,
+    // numbers checked). Simulated fares keep the old model and its wording.
+    const routeName = `${cityByCode.get(fl.from)?.name ?? fl.from} → ${cityByCode.get(fl.to)?.name ?? fl.to}`;
+    const exp = advice.method === "history" ? await explainFare(advice, routeName, fl.date, l, flags.book_nudge_copy, conv.id, flags.fare_explainer_enabled) : undefined;
+    cards.push({ type: "fare", advice, variant: flags.book_nudge_copy, route: `${fl.from}→${fl.to}`, explanation: exp?.text, explainedBy: exp?.via });
+    lines.push(exp ? `${advice.verdict === "monitor" ? "👀" : "⏰"} ${exp.text}` : t.nudge(l, flags.book_nudge_copy, advice));
+    trace("engine", conv.id, {
+      step: "fare advice", source: advice.source, method: advice.method, verdict: advice.verdict, reason: advice.reason, currentFare: advice.currentFare,
+      evidence: advice.evidence && { days: advice.evidence.days, cheaperThanPct: advice.evidence.cheaperThanPct, trendPct: advice.evidence.trendPct, drop7: advice.evidence.drop.find((d) => d.days === 7) },
+      backtest: advice.backtest, explainedBy: exp?.via, abVariant: flags.book_nudge_copy,
+    });
   }
 
   const poolIt = its.find((i) => i.pool);

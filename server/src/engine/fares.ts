@@ -1,6 +1,7 @@
 // Simulated fare model: "when should I book?".
 // fare(travelDate, bookedOn) = base × festiveSurge(travelDate) × leadTimeCurve(daysOut) × noise
 import { festivals } from "./seed.ts";
+import { analyse, backtest, cleanHistory, decide, type FareEvidence, type VerdictReason } from "./fareStats.ts";
 
 export interface FareModel {
   festiveSurgePct: number; // extra % on festive travel dates
@@ -66,6 +67,12 @@ export interface FareAdvice {
   history: { date: string; fare: number }[]; // past quotes for this travel date (Google Flights when live)
   forecast: { date: string; fare: number }[]; // until travel date (model shape, anchored to today's price)
   source: "google_flights" | "simulated";
+  /** "history": verdict from the real price history (fareStats.ts). "model": the simulated fare model. */
+  method: "history" | "model";
+  evidence?: FareEvidence;
+  reason?: VerdictReason | "waiting_didnt_pay";
+  /** How the rules would have done on this route's own history (see fareStats.backtest). */
+  backtest?: { days: number; accuracy: number; alwaysBookAccuracy: number; monitorCalls: number; monitorRight: number };
   priceLevel?: string; // Google's "low" | "typical" | "high"
   typicalRange?: [number, number];
   volatilityPct: number;
@@ -93,6 +100,58 @@ function volatilityFrom(history: { fare: number }[]): number | undefined {
 }
 
 export function adviseFare(baseFare: number, travelDate: string, today: Date, m: FareModel, key: string, live?: LiveFareInput): FareAdvice {
+  if (live && cleanHistory(live.history).length >= 7) return adviseFromHistory(travelDate, today, m, live);
+  return adviseFromModel(baseFare, travelDate, today, m, key, live);
+}
+
+/**
+ * Live path: every number comes from Google's price history for this route + date. No invented forecast:
+ * the chart shows the history and today, and the verdict comes from plain rules (fareStats.decide), kept honest
+ * by a backtest on the same route.
+ */
+function adviseFromHistory(travelDate: string, today: Date, m: FareModel, live: LiveFareInput): FareAdvice {
+  const t0 = toDay(today);
+  const daysOut = toDay(travelDate) - t0;
+  const current = live.lowestPrice;
+  const history = cleanHistory(live.history.filter((h) => h.date < iso(t0))).slice(-90);
+  const fest = festiveFor(travelDate, m);
+  const e = analyse(history, current);
+  let v = decide(e, { currentFare: current, daysOut, priceLevel: live.priceLevel, festival: fest?.name });
+  const bt = backtest(history);
+  let reason: FareAdvice["reason"] = v.reason;
+  // Self-check: only suggest waiting if waiting would have paid off on this route's own history.
+  if (v.verdict === "monitor" && bt.monitorCalls >= 3 && bt.monitorRight / bt.monitorCalls < 0.5) {
+    v = { verdict: "book_now", reason: v.reason };
+    reason = "waiting_didnt_pay";
+  }
+  const expectedFare = live.typicalRange ? Math.round((live.typicalRange[0] + live.typicalRange[1]) / 2 / 10) * 10 : e?.median ?? current;
+  return {
+    source: "google_flights",
+    method: "history",
+    evidence: e ?? undefined,
+    reason,
+    backtest: { days: bt.days, accuracy: bt.accuracy, alwaysBookAccuracy: bt.alwaysBookAccuracy, monitorCalls: bt.monitorCalls, monitorRight: bt.monitorRight },
+    priceLevel: live.priceLevel,
+    typicalRange: live.typicalRange,
+    volatilityPct: volatilityFrom(history) ?? m.volatilityPct ?? 4,
+    fetchedAt: live.fetchedAt,
+    verdict: v.verdict,
+    currentFare: current,
+    expectedFare,
+    vsExpectedPct: Math.round(((current - expectedFare) / expectedFare) * 100),
+    dropProb: (e?.drop ?? []).filter((d) => d.samples >= 5 && d.days < daysOut).map((d) => ({ days: d.days, pct: d.pct })),
+    bestFare: current,
+    bestBookBy: iso(t0),
+    daysOut,
+    festival: fest?.name,
+    savings: v.verdict === "monitor" ? v.expectedSave ?? 0 : 0,
+    history,
+    forecast: [{ date: iso(t0), fare: current }],
+  };
+}
+
+/** Simulated path (no live data): the original fare model. */
+function adviseFromModel(baseFare: number, travelDate: string, today: Date, m: FareModel, key: string, live?: LiveFareInput): FareAdvice {
   const t0 = toDay(today);
   const travel = toDay(travelDate);
   const daysOut = travel - t0;
@@ -142,6 +201,7 @@ export function adviseFare(baseFare: number, travelDate: string, today: Date, m:
   else if ((p7 >= 25 || live?.priceLevel === "high") && daysOut > 10) verdict = "monitor"; // a decent chance it dips: let us watch it for you
   return {
     source: live ? "google_flights" : "simulated",
+    method: "model",
     priceLevel: live?.priceLevel,
     typicalRange: live?.typicalRange,
     volatilityPct,
