@@ -28,18 +28,18 @@ export default function Ops() {
   };
   return (
     <div className="mx-auto max-w-6xl space-y-5 px-4 pb-20 pt-8">
-      <div className="rounded-3xl bg-night p-6 text-cream md:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-marigold">Ops</p><h1 className="mt-1 font-display text-4xl font-bold">Surviving Diwali eve</h1>
-        <p className="mt-1 max-w-3xl text-sm text-cream/75">
+      <div className="rounded-3xl bg-navy p-6 text-paper md:p-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sky">Ops</p><h1 className="mt-1 font-display text-4xl font-bold">Surviving Diwali eve</h1>
+        <p className="mt-1 max-w-3xl text-sm text-paper/75">
           Pool watchers run as Kubernetes pods. On the night before a festival, pool requests spike and the watcher pods run out of memory.
           <b> NudgeBee</b> spots the OOMKilled pods, runs an AI root-cause analysis, asks a human to approve, scales the watcher deployment, and flips the
           <b> Flagsmith</b> flag <code className="rounded bg-white/15 px-1">degrade_gracefully</code> so watchers take smaller batches instead of crashing.
         </p>
         {s.flags.judge_controls && (
           <div className="mt-3 flex flex-wrap gap-2">
-            <button onClick={() => run(api.surge, "Surge injected: 1,500 pool requests. Watch the pods.")} className="rounded-full bg-marigold px-5 py-2.5 font-semibold text-night hover:bg-[#ffb43d]">🎆 Simulate Diwali-eve surge</button>
+            <button onClick={() => run(api.surge, "Surge injected: 1,500 pool requests. Watch the pods.")} className="rounded-full bg-sky px-5 py-2.5 font-semibold text-navy hover:bg-[#8ad8ff]">🎆 Simulate Diwali-eve surge</button>
             <button onClick={() => run(api.clearSurge, "Surge traffic cleared.")} className="rounded-full bg-white/10 px-5 py-2.5 text-sm hover:bg-white/20">Clear surge</button>
-            {msg && <span className="self-center text-sm text-cream/75">{msg}</span>}
+            {msg && <span className="self-center text-sm text-paper/75">{msg}</span>}
           </div>
         )}
       </div>

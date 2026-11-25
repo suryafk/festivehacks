@@ -12,6 +12,20 @@ Running log of every change, newest first. Each entry says what changed, how it 
 
 ---
 
+## Unreleased · 2026-11-25 · generic travel theme · not deployed
+- **Why:** the platform is for any trip in India. The festive rush is a feature (and the Ops demo), not the whole identity.
+- **Palette** (`web/src/index.css`): marigold / vermilion / maroon-night are replaced by navy `#0b1d36`, paper `#f6f9fc`, mist, ocean-blue `brand` `#1e5bd8` (actions, headings, kickers), and `sky` `#5cc8ff` (highlight on dark, with navy text). Red `danger` `#d93025` now only marks errors, recording, "dearer" and OOMKilled. Teal `leaf` is kept for good news. Tokens and inline SVG/hex colours were renamed across every page.
+- **Type:** Plus Jakarta Sans for headings (was the Fraunces serif); Mukta for Devanagari (was Tiro).
+- **Decoration:** removed the hanging-lights strip and paper grain; added a faint map grid. The diya is replaced by an SVG route logo (nav, footer, favicon); the error page uses 🧭.
+- **Copy:** hero kicker "Door to door · anywhere in India · 22+ languages"; hero line "A trip across India shouldn't take three apps…"; "Everything between your door and your destination"; Plan page "Where are you headed?"; footer and meta description made generic.
+  - Kept on purpose: the "Built for the festive rush" feature card, festive-rush buffers, the Ops "Surviving Diwali eve" story, and the hackathon name.
+  - The fare card's festival badge is now "📅 Christmas peak season".
+- **Also:**
+  - The landing fare illustration now matches the new history-based card: no forecast line, and the label "cheaper than 65% of the last 60 days".
+  - The fare chart's "today" label is no longer clipped.
+  - A price within 1% of typical reads "about the usual price", not "0% cheaper".
+- **Verified locally:** web `tsc` clean. Screenshots (headless Chromium) of the landing page at desktop and 390 px (no sideways scroll), the Plan page with a live plan (BLR→Gonda), and Ops.
+
 ## Unreleased · 2026-11-25 · fare pointer from real price history · not deployed
 - **Why:** the old pointer used a hardcoded curve (festival surcharge × lead-time × noise). Its "chance of a drop" was a Monte Carlo run over that curve, and its forecast line was invented. Nothing in it had been tested.
 - **New `server/src/engine/fareStats.ts`** (pure, unit-tested), used whenever Google returns ≥7 days of price history:
