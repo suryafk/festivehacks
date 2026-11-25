@@ -8,7 +8,7 @@ Running log of every change, newest first. Each entry says what changed, how it 
 - Add an entry here for every change.
 
 **Live:** https://34-93-164-65.sslip.io (GCP, project `project-d549298b-2c05-4b94-b8e`, VM `marg-bandhu`, `asia-south1-a`, k3s).
-**Currently deployed commit:** `e920e1c` (v0.5)
+**Currently deployed commit:** `c6c75d3` (v0.7)
 
 ---
 
@@ -37,7 +37,7 @@ Running log of every change, newest first. Each entry says what changed, how it 
   - The "no train data" note no longer says "UP and Bihar only".
 - **Verified locally:** `npm test` 20/20, web `tsc` clean, and train-only plans for all 10 directions (incl. Hindi "झाँसी से हैदराबाद"). UI to be checked by the owner.
 
-## Unreleased · 2026-11-25 · generic travel theme · not deployed
+### generic travel theme
 - **Why:** the platform is for any trip in India. The festive rush is a feature (and the Ops demo), not the whole identity.
 - **Palette** (`web/src/index.css`): marigold / vermilion / maroon-night are replaced by navy `#0b1d36`, paper `#f6f9fc`, mist, ocean-blue `brand` `#1e5bd8` (actions, headings, kickers), and `sky` `#5cc8ff` (highlight on dark, with navy text). Red `danger` `#d93025` now only marks errors, recording, "dearer" and OOMKilled. Teal `leaf` is kept for good news. Tokens and inline SVG/hex colours were renamed across every page.
 - **Type:** Plus Jakarta Sans for headings (was the Fraunces serif); Mukta for Devanagari (was Tiro).
@@ -51,7 +51,12 @@ Running log of every change, newest first. Each entry says what changed, how it 
   - A price within 1% of typical reads "about the usual price", not "0% cheaper".
 - **Verified locally:** web `tsc` clean. Screenshots (headless Chromium) of the landing page at desktop and 390 px (no sideways scroll), the Plan page with a live plan (BLR→Gonda), and Ops.
 
-## Unreleased · 2026-11-25 · fare pointer from real price history · not deployed
+## v0.6 · 2026-11-25 · `f1227cc` (PR #1 merged) · deployed
+**Deployed from `main` on request.** It contains the three entries below, from PR #1 "any-place-and-fare-prediction".
+- Pre-deploy checks (local, real keys): 20/20 tests; web builds. Bengaluru → Gonda (EN + HI) still plans with live Google Flights (₹7,935). Pune → Ahmedabad (new any-place routing): direct IndiGo, live ₹3,787. Chennai → Darbhanga plans. Nepal → "we only plan trips within India". Browser: the new price card ("today vs the last 7 days", Sarvam-written explanation) renders with the live badge. The new outside call is OpenStreetMap Nominatim (no key, generic User-Agent, 1 req/s, cached). No new env vars required (`SARVAM_EXPLAIN_MODEL` optional). SerpApi: 241 → 240 searches left.
+- Live checks after deploy: healthz shows all sponsors true; the same three trips give the same results; 2 watchers alive; flags from Flagsmith; web HTTP 200.
+
+### fare pointer from real price history
 - **Why:** the old pointer used a hardcoded curve (festival surcharge × lead-time × noise). Its "chance of a drop" was a Monte Carlo run over that curve, and its forecast line was invented. Nothing in it had been tested.
 - **New `server/src/engine/fareStats.ts`** (pure, unit-tested), used whenever Google returns ≥7 days of price history:
   - evidence: share of past days dearer than today, min / median, weekly trend;
@@ -82,7 +87,7 @@ Running log of every change, newest first. Each entry says what changed, how it 
   - Live keys on a separate instance (port 8081, copy of the DB, no extra SerpApi searches) for BLR→Gonda (en + hi), Delhi→Shimla, Pune→Rishikesh (en + hi). Explanations were accepted and correct. A repeat plan takes 0.6–3 s (cached).
   - WhatsApp blocks rendered.
 
-## Unreleased · 2026-11-25 · any origin and destination in India · not deployed
+### any origin and destination in India
 - **Places:** new `server/src/engine/places.ts`. Seed towns keep their hand-made data. **117 Indian airports** with scheduled flights come from OurAirports (public domain), built into `server/src/data/airports-in.json` by `scripts/build-airports.mjs`, with corrected city names (Mopa → Goa, Bhuntar → Kullu/Manali; Shimla added by hand). Any other place is looked up on **OpenStreetMap Nominatim**: India only, 1 request/s, real User-Agent, cached forever in SQLite (`places`, `geocode_cache`), Hindi name from `name:hi`. Every place gets a nearest suitable airport (bigger airports preferred) plus a **backup airport**.
 - **Planner:** fly between the two places' airports, with a cab to the airport if the origin has none. Last mile by seed train or cab. New **"Cab all the way"** option for trips under 700 km. Distance-based simulated timetables for routes outside the seed. Labels: Cab + flight, Cab + flight + cab, and so on. Fixed itineraries sharing one tags array.
 - **Live flights:** up to 2 SerpApi searches per plan. If Google says the nearest airports have no flights (e.g. Delhi–Shimla), try the backup pair (Delhi–Chandigarh + cab) and never invent flights there. "No results" is cached as an answer. One retry on a dropped connection.
@@ -92,7 +97,7 @@ Running log of every change, newest first. Each entry says what changed, how it 
 - **Limits:** trains only on seed routes; Gorakhpur (GKP seed town) still routes via Lucknow although it has its own airport (GOP).
 - Verified locally: `npm test` 11/11 (new tests: any-city parsing, gaya); web `tsc` clean. Offline: Delhi→Shimla, Pune→Rishikesh, Hyderabad→Madhubani, Madhubani→Bengaluru (form), Kathmandu ("outside India"), unknown place, pool matched at Darbhanga, cab-mates map. Live keys: Sarvam extracted all names (incl. Hindi शिमला); Delhi→Shimla used live DEL→IXC after Google had no DEL→SLV; Pune→Rishikesh live PNQ→DED; Bengaluru→Gonda unchanged. About 5 SerpApi searches used (243 left).
 
-## Unreleased · 2026-11-25 · fix paths with spaces · not deployed
+### fix paths with spaces
 - `server/src/config.ts` and both tests used `new URL(...).pathname`, which URL-encodes spaces (`Ubuntu Backup` → `Ubuntu%20Backup`). With a space in the checkout path the server couldn't find `web/dist` (`/` returned 404) and the default `DATA_DIR`/test temp dirs were created under a stray `…%20…` folder. Switched to `fileURLToPath()`. No effect on the VM or Docker (no spaces, and `DATA_DIR`/`WEB_DIST` are set there).
 - Verified locally: `npm test` 10/10; offline run and live-key run with no path overrides: web app served, Hindi trip → PLAN_READY (live Google Flights ₹7,935), metro→metro and "Shimla" get "not covered", pool matched with fair split, fare watch, Bulbul voice reply (WAV served), ops/metrics OK.
 
