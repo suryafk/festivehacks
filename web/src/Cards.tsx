@@ -25,7 +25,7 @@ function FareChart({ a }: { a: FareAdvice }) {
       <line x1={x(ti)} x2={x(ti)} y1={P} y2={H - P} stroke="#1b1530" strokeOpacity="0.4" />
       <circle cx={x(ti)} cy={y(a.currentFare)} r="5" fill="#1b1530" />
       <text x={x(ti)} y={H + 14} fontSize="11" textAnchor="middle" fill="#1b1530">today</text>
-      <text x={P} y={H + 14} fontSize="11" fill="#6b6478">3 weeks ago</text>
+      <text x={P} y={H + 14} fontSize="11" fill="#6b6478">{a.history[0] ? `since ${day(a.history[0].date)}` : ""}</text>
       <text x={W - P} y={H + 14} fontSize="11" textAnchor="end" fill="#6b6478">travel day</text>
     </svg>
   );
@@ -66,7 +66,12 @@ export function FlightPriceCard({ card, watch, judge, onBook, onWatch, onSimulat
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Flight price outlook · {card.route}</p>
           <h3 className="mt-1 font-display text-2xl font-bold">Should you book today?</h3>
         </div>
-        {a.festival && <span className="rounded-full bg-vermilion/10 px-3 py-1 text-xs font-semibold text-vermilion">🪔 {a.festival} surge pricing</span>}
+        <div className="flex flex-wrap gap-2">
+          {a.source === "google_flights"
+            ? <span className="rounded-full bg-leaf-soft px-3 py-1 text-xs font-semibold text-leaf" title={a.fetchedAt ? `Fetched ${new Date(a.fetchedAt).toLocaleString("en-IN")}` : undefined}>● Live · Google Flights</span>
+            : <span className="rounded-full bg-ink/5 px-3 py-1 text-xs font-semibold text-muted">Simulated fares</span>}
+          {a.festival && <span className="rounded-full bg-vermilion/10 px-3 py-1 text-xs font-semibold text-vermilion">🪔 {a.festival} surge pricing</span>}
+        </div>
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -76,11 +81,12 @@ export function FlightPriceCard({ card, watch, judge, onBook, onWatch, onSimulat
           <div className="text-xs text-cream/60">{a.daysOut} days before travel</div>
         </div>
         <div className="rounded-2xl bg-sand/70 p-4">
-          <div className="text-xs uppercase tracking-wider text-muted">Expected (history)</div>
+          <div className="text-xs uppercase tracking-wider text-muted">{a.typicalRange ? "Typical (Google)" : "Expected (history)"}</div>
           <div className="mt-1 font-display text-3xl font-bold tabular-nums">{rupee(a.expectedFare)}</div>
           <div className={`text-xs font-medium ${a.vsExpectedPct <= 0 ? "text-leaf" : "text-vermilion"}`}>
             today is {Math.abs(a.vsExpectedPct)}% {a.vsExpectedPct <= 0 ? "cheaper" : "dearer"}
           </div>
+          {a.typicalRange && <div className="text-xs text-muted">range {rupee(a.typicalRange[0])}–{rupee(a.typicalRange[1])}{a.priceLevel ? ` · Google says "${a.priceLevel}"` : ""}</div>}
         </div>
         <div className="rounded-2xl bg-sand/70 p-4">
           <div className="text-xs uppercase tracking-wider text-muted">Chance it drops ≥5%</div>
@@ -118,7 +124,11 @@ export function FlightPriceCard({ card, watch, judge, onBook, onWatch, onSimulat
           </button>
         </div>
       </div>
-      <p className="mt-3 text-[11px] text-muted">Fares and history are simulated for the demo. A/B copy variant: {card.variant} (Flagsmith).</p>
+      <p className="mt-3 text-[11px] text-muted">
+        {a.source === "google_flights"
+          ? `Today's price, typical range and price history: Google Flights via SerpApi. Forecast and drop chance: our model, calibrated to that history (daily volatility ${a.volatilityPct ?? "?"}%).`
+          : "Fares and history are simulated for the demo (no live fare feed for this search)."} A/B copy variant: {card.variant} (Flagsmith).
+      </p>
     </section>
   );
 }

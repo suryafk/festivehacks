@@ -6,3 +6,6 @@ server/data/
 !.env.example
 .DS_Store
 *.log
+
+# GCP service account keys (never commit)
+*-sa-key.json

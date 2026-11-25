@@ -39,7 +39,8 @@ export function webRoutes(app: FastifyInstance) {
       whatsapp: f.whatsapp_channel_enabled,
       festiveRush: f.festive_rush_mode,
       sponsors: { sarvam: has.sarvam(), flagsmith: has.flagsmith() && f.source === "flagsmith", twilio: has.twilio() },
-      sandbox: { number: config.twilio.from.replace("whatsapp:", ""), join: process.env.TWILIO_SANDBOX_JOIN ?? "" },
+      // Accept "salt-gentle" or "join salt-gentle" in the env; users must send the full "join …" message.
+      sandbox: { number: config.twilio.from.replace("whatsapp:", ""), join: (process.env.TWILIO_SANDBOX_JOIN ?? "").trim().replace(/^(join\s+)?(.+)$/i, "join $2").replace(/^join $/, "") },
     };
   });
 

@@ -1,0 +1,16 @@
+{
+  "best_flights": [
+    { "flights": [ { "departure_airport": { "id": "BLR", "time": "2026-12-26 06:05" }, "arrival_airport": { "id": "LKO", "time": "2026-12-26 08:45" }, "duration": 160, "airline": "IndiGo", "flight_number": "6E 6157" } ], "total_duration": 160, "price": 7412, "type": "One way" },
+    { "flights": [ { "departure_airport": { "id": "BLR", "time": "2026-12-26 10:20" }, "arrival_airport": { "id": "LKO", "time": "2026-12-26 13:05" }, "duration": 165, "airline": "Air India Express", "flight_number": "IX 2741" } ], "total_duration": 165, "price": 6985, "type": "One way" }
+  ],
+  "other_flights": [
+    { "flights": [ { "departure_airport": { "id": "BLR", "time": "2026-12-26 14:00" }, "arrival_airport": { "id": "DEL", "time": "2026-12-26 16:50" }, "airline": "Akasa Air", "flight_number": "QP 1361" }, { "departure_airport": { "id": "DEL", "time": "2026-12-26 18:30" }, "arrival_airport": { "id": "LKO", "time": "2026-12-26 19:35" }, "airline": "Akasa Air", "flight_number": "QP 1720" } ], "total_duration": 335, "price": 6420, "type": "One way" },
+    { "flights": [ { "departure_airport": { "id": "BLR", "time": "2026-12-26 21:15" }, "arrival_airport": { "id": "LKO", "time": "2026-12-26 23:55" }, "airline": "IndiGo", "flight_number": "6E 2116" } ], "total_duration": 160, "price": "bad-price", "type": "One way" }
+  ],
+  "price_insights": {
+    "lowest_price": 6420,
+    "price_level": "high",
+    "typical_price_range": [4800, 6200],
+    "price_history": [[1792540800, 6100], [1792627200, 6150], [1792713600, 6050], [1792800000, 6300], [1792886400, 6420], [1792972800, 6380], [1793059200, 6500], [1793145600, 6450], [1793232000, 6600], [1793318400, 6420]]
+  }
+}

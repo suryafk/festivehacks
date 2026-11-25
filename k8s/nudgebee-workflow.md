@@ -27,22 +27,24 @@ Trigger: Kubernetes event / alert for `OOMKilled` (or `CrashLoopBackOff`) on dep
 
 ### Flagsmith call (step 5)
 
-Find the feature-state id once:
+The Marg Bandhu Flagsmith environment ("Development", project 56018) uses **v2 feature versioning**, so the old
+`/featurestates/{id}/` PATCH is refused (HTTP 400). Use Flagsmith's versioning-safe endpoint instead.
+Tested 2026-11-25: ON → the app saw `degrade_gracefully = true` within seconds; OFF → `false`.
 
-```bash
-curl -s -H "Authorization: Api-Key $FLAGSMITH_ADMIN_API_KEY" \
-  "https://api.flagsmith.com/api/v1/environments/$FLAGSMITH_ENVIRONMENT_KEY/featurestates/?feature_name=degrade_gracefully"
-```
-
-Then the workflow's HTTP task:
+The workflow's HTTP task:
 
 ```
-PATCH https://api.flagsmith.com/api/v1/environments/<FLAGSMITH_ENVIRONMENT_KEY>/featurestates/<featurestate_id>/
-Authorization: Api-Key <FLAGSMITH_ADMIN_API_KEY>
+PATCH https://api.flagsmith.com/api/__future__/environments/NSsV2qMXcyyE8vXRmAJ7YV/features/303424/
+Authorization: Token <FLAGSMITH_ADMIN_API_KEY>
 Content-Type: application/json
 
-{"enabled": true}
+{"environment_default": {"enabled": true}}
 ```
+
+- `NSsV2qMXcyyE8vXRmAJ7YV` is the Development environment key (the client-side key, not the `ser.` server key).
+- `303424` is the feature ID of `degrade_gracefully`.
+- The admin key here is a **personal API token**, so the header is `Token …`. An organisation Master API key would use `Api-Key …`.
+- To reset after the demo, send the same request with `{"environment_default": {"enabled": false}}`.
 
 The API and the watchers pick the flag up on their next poll (a few seconds), and watchers drop from batch 50 to batch 5 at half the pace.
 Memory drops from ~600 MB to ~160 MB per pod, so pods stop crashing and the queue drains.

@@ -7,9 +7,10 @@ import { extractIntent, detectLang } from "./intent.ts";
 import { plan, type Itinerary, type Trip } from "./planner.ts";
 import { adviseFare } from "./fares.ts";
 import { t, langKey } from "./i18n.ts";
-import { cityByCode, type Mode } from "./seed.ts";
+import { cityByCode, flights as seedFlights, type Mode } from "./seed.ts";
 import { addSimulatedRider, createRequest, ensureSeedRiders, poolOf, previewCount, waitingNear } from "./pools.ts";
 import { splitFare, compatible } from "./pooling.ts";
+import { getLiveFares, type LiveFlight } from "../integrations/googleFlights.ts";
 
 export type Action =
   | { type: "set_modes"; modes: Mode[] }
@@ -87,14 +88,23 @@ export async function handle(conv: ConvRow, input: Input): Promise<Reply> {
 async function finish(conv: ConvRow, input: Input, out: Reply, lang: string, trip: Trip): Promise<Reply> {
   // other Indian languages: translate our English copy with Sarvam Mayura
   if (!["en-IN", "hi-IN"].includes(lang)) out.text = await translate(out.text, lang, conv.id);
-  if (input.wasVoice) out.audioUrl = await textToSpeech(spokenVersion(out.text), lang, conv.id);
+  if (input.wasVoice) out.audioUrl = await textToSpeech(spokenVersion(out.text, lang), lang, conv.id);
   convs.update(conv.id, { trip: JSON.stringify(trip), lang, stage: out.stage });
   trace("engine", conv.id, { step: "reply", stage: out.stage, wasVoice: Boolean(input.wasVoice), lang, cards: out.cards.map((c) => c.type) });
   return out;
 }
 
 // Speak the headline, not the timetable.
-const spokenVersion = (text: string) => text.split("\n").filter((line) => !/^\s*[•\-\d]/.test(line)).join(" ").replace(/[🎙️⏰💰💡🚕👀🎉✈️🚆]/gu, "").slice(0, 450);
+// Arrows and abbreviations read badly aloud ("→" was spoken as "gives"), so say them as words.
+const spokenVersion = (text: string, lang: string) =>
+  text
+    .split("\n")
+    .filter((line) => !/^\s*[•\-\d]/.test(line))
+    .join(" ")
+    .replace(/\s*→\s*/g, lang.startsWith("hi") ? " से " : " to ")
+    .replace(/दिस॰/g, "दिसंबर")
+    .replace(/[🎙️⏰💰💡🚕👀🎉✈️🚆]/gu, "")
+    .slice(0, 450);
 
 async function nextStep(conv: ConvRow, trip: Trip, flags: Awaited<ReturnType<typeof getFlags>>, today: Date, l: "en" | "hi", reply: (t: string, e?: Partial<Reply>) => Reply): Promise<Reply> {
   if (!trip.destination) return reply(t.askDestination(l), { stage: "COLLECTING", quickReplies: ["Gonda", "Gorakhpur", "Patna", "Jaunpur"] });
@@ -103,7 +113,18 @@ async function nextStep(conv: ConvRow, trip: Trip, flags: Awaited<ReturnType<typ
   if (!trip.modes?.length) return reply(t.askModes(l), { stage: "COLLECTING", quickReplies: MODE_CHIPS, cards: [{ type: "ask-modes" }] });
 
   const knobs = rushKnobs(flags);
-  const its = plan(trip as Required<Pick<Trip, "origin" | "destination" | "date">> & Trip, { bufferMin: knobs.bufferMin, fareModel: flags.fare_model, today });
+
+  // Live Google Flights data for the main flight leg on the requested date (one cached search; quota-friendly).
+  const destCity = cityByCode.get(trip.destination!);
+  const flyTo = destCity?.kind === "town" ? destCity.hub : destCity?.code;
+  const liveMap = new Map<string, LiveFlight[]>();
+  let liveFares: Awaited<ReturnType<typeof getLiveFares>> = null;
+  if (flags.live_fares_enabled && trip.modes?.includes("flight") && flyTo && flyTo !== trip.origin && trip.origin && trip.date) {
+    liveFares = await getLiveFares(trip.origin!, flyTo, trip.date!, conv.id);
+    if (liveFares) liveMap.set(`${trip.origin}-${flyTo}-${trip.date}`, liveFares.flights);
+  }
+
+  const its = plan(trip as Required<Pick<Trip, "origin" | "destination" | "date">> & Trip, { bufferMin: knobs.bufferMin, fareModel: flags.fare_model, today, live: liveMap });
   trace("engine", conv.id, { step: "plan", options: its.length, bufferMin: knobs.bufferMin, festive_rush_mode: flags.festive_rush_mode });
   if (!its.length) return reply(t.noRoute(l), { stage: "COLLECTING", quickReplies: MODE_CHIPS, cards: [{ type: "ask-modes" }] });
 
@@ -112,12 +133,21 @@ async function nextStep(conv: ConvRow, trip: Trip, flags: Awaited<ReturnType<typ
   const best = its[0];
   lines.push(...best.legs.filter((x) => x.mode !== "transfer").map((leg) => `• ${t.legLine(l, leg)}`));
 
-  const fl = its.find((i) => i.flight)?.flight;
+  // Price outlook is for the main flight route on the requested date. With live Google data it always uses that,
+  // whichever itinerary (possibly a ±flex day) ended up recommended.
+  const seedRoute = flyTo ? seedFlights.find((f) => f.from === trip.origin && f.to === flyTo) : undefined;
+  const fl = liveFares && flyTo
+    ? { from: trip.origin!, to: flyTo, baseFare: seedRoute?.baseFare ?? liveFares.insights.lowestPrice ?? 6000, date: trip.date! }
+    : (its.find((i) => i.flight && i.date === trip.date) ?? its.find((i) => i.flight))?.flight;
   if (fl) {
-    const advice = adviseFare(fl.baseFare, fl.date, today, flags.fare_model, `${fl.from}${fl.to}`);
+    const useLive = Boolean(liveFares && fl.date === trip.date && fl.to === flyTo);
+    const lowest = useLive ? liveFares!.insights.lowestPrice ?? Math.min(...liveFares!.flights.map((f) => f.price)) : 0;
+    const advice = adviseFare(fl.baseFare, fl.date, today, flags.fare_model, `${fl.from}${fl.to}`, useLive
+      ? { lowestPrice: lowest, priceLevel: liveFares!.insights.priceLevel, typicalRange: liveFares!.insights.typicalRange, history: liveFares!.insights.history, fetchedAt: liveFares!.fetchedAt }
+      : undefined);
     cards.push({ type: "fare", advice, variant: flags.book_nudge_copy, route: `${fl.from}→${fl.to}` });
     lines.push(t.nudge(l, flags.book_nudge_copy, advice));
-    trace("engine", conv.id, { step: "fare advice", verdict: advice.verdict, currentFare: advice.currentFare, abVariant: flags.book_nudge_copy });
+    trace("engine", conv.id, { step: "fare advice", source: advice.source, verdict: advice.verdict, currentFare: advice.currentFare, expected: advice.expectedFare, volatilityPct: advice.volatilityPct, abVariant: flags.book_nudge_copy });
   }
 
   const poolIt = its.find((i) => i.pool);

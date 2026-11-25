@@ -63,20 +63,51 @@ export interface FareAdvice {
   festival?: string;
   savings: number;
   riseAfter?: string; // date after which fares jump
-  history: { date: string; fare: number }[]; // past 21 days (simulated)
-  forecast: { date: string; fare: number }[]; // until travel date
+  history: { date: string; fare: number }[]; // past quotes for this travel date (Google Flights when live)
+  forecast: { date: string; fare: number }[]; // until travel date (model shape, anchored to today's price)
+  source: "google_flights" | "simulated";
+  priceLevel?: string; // Google's "low" | "typical" | "high"
+  typicalRange?: [number, number];
+  volatilityPct: number;
+  fetchedAt?: number;
+}
+
+/** Real market data for this route + date, from Google Flights. */
+export interface LiveFareInput {
+  lowestPrice: number;
+  priceLevel?: string;
+  typicalRange?: [number, number];
+  history: { date: string; fare: number }[];
+  fetchedAt: number;
 }
 
 const iso = (day: number) => new Date(day * DAY).toISOString().slice(0, 10);
 
-export function adviseFare(baseFare: number, travelDate: string, today: Date, m: FareModel, key: string): FareAdvice {
+/** Day-to-day volatility (std of % changes) from a real price history, clamped to a sane band. */
+function volatilityFrom(history: { fare: number }[]): number | undefined {
+  if (history.length < 5) return undefined;
+  const ch = history.slice(1).map((h, i) => (h.fare - history[i].fare) / history[i].fare);
+  const mean = ch.reduce((a, b) => a + b, 0) / ch.length;
+  const sd = Math.sqrt(ch.reduce((a, b) => a + (b - mean) ** 2, 0) / ch.length) * 100;
+  return Math.min(15, Math.max(2, Math.round(sd * 10) / 10));
+}
+
+export function adviseFare(baseFare: number, travelDate: string, today: Date, m: FareModel, key: string, live?: LiveFareInput): FareAdvice {
   const t0 = toDay(today);
   const travel = toDay(travelDate);
   const daysOut = travel - t0;
-  const history = [];
+  let history: { date: string; fare: number }[] = [];
   for (let d = t0 - 21; d < t0; d++) history.push({ date: iso(d), fare: fareOn(baseFare, travelDate, new Date(d * DAY), m, key) });
-  const forecast = [];
+  let forecast: { date: string; fare: number }[] = [];
   for (let d = t0; d <= travel; d++) forecast.push({ date: iso(d), fare: fareOn(baseFare, travelDate, new Date(d * DAY), m, key) });
+
+  if (live) {
+    // Anchor the model's lead-time/festive shape to the real price today, and use Google's real history.
+    const ratio = live.lowestPrice / (forecast[0]?.fare || live.lowestPrice);
+    forecast = forecast.map((f, i) => ({ date: f.date, fare: i === 0 ? live.lowestPrice : Math.round((f.fare * ratio) / 10) * 10 }));
+    if (live.history.length >= 3) history = live.history.filter((h) => h.date < iso(t0)).slice(-60);
+  }
+  const volatilityPct = (live && volatilityFrom(live.history)) ?? m.volatilityPct ?? 4;
 
   const current = forecast[0]?.fare ?? baseFare;
   // only consider the next 10 days of waiting — beyond that the risk of sell-out in festive season is real
@@ -86,9 +117,11 @@ export function adviseFare(baseFare: number, travelDate: string, today: Date, m:
   const savings = current - best.fare;
   const fest = festiveFor(travelDate, m);
 
-  // "What should this cost?" — the median of the quotes we've seen for this travel date over the past 3 weeks.
+  // "What should this cost?" — Google's typical range midpoint when live, else the median of recent quotes.
   const sorted = history.map((h) => h.fare).sort((a, b) => a - b);
-  const expectedFare = sorted.length ? sorted[Math.floor(sorted.length / 2)] : current;
+  const expectedFare = live?.typicalRange
+    ? Math.round((live.typicalRange[0] + live.typicalRange[1]) / 2 / 10) * 10
+    : sorted.length ? sorted[Math.floor(sorted.length / 2)] : current;
 
   // Probability of a meaningful (≥5%) drop within N days: Monte Carlo over the forecast with daily volatility.
   const rng = mulberry32(Math.floor(hashNoise(`${key}|${travelDate}|${t0}`) * 1e9));
@@ -97,16 +130,22 @@ export function adviseFare(baseFare: number, travelDate: string, today: Date, m:
     if (!days.length) return 0;
     let hits = 0;
     const runs = 600;
-    for (let r = 0; r < runs; r++) if (days.some((d) => d.fare * (1 + gauss(rng) * (m.volatilityPct ?? 7) / 100) < current * 0.95)) hits++;
+    for (let r = 0; r < runs; r++) if (days.some((d) => d.fare * (1 + (gauss(rng) * volatilityPct) / 100) < current * 0.95)) hits++;
     return Math.round((hits / runs) * 100);
   };
   const dropProb = [3, 7].filter((n) => n < daysOut).map((n) => ({ days: n, pct: dropWithin(n) }));
   const p7 = dropProb.find((d) => d.days === 7)?.pct ?? dropProb[0]?.pct ?? 0;
 
   let verdict: FareAdvice["verdict"] = "book_now";
-  if (savings > Math.max(250, current * 0.05) && !(fest && daysOut < 21)) verdict = "wait";
-  else if (p7 >= 25 && daysOut > 10) verdict = "monitor"; // a decent chance it dips: let us watch it for you
+  if (live?.priceLevel === "low") verdict = "book_now"; // Google says it's already a low price: don't gamble
+  else if (savings > Math.max(250, current * 0.05) && !(fest && daysOut < 21)) verdict = "wait";
+  else if ((p7 >= 25 || live?.priceLevel === "high") && daysOut > 10) verdict = "monitor"; // a decent chance it dips: let us watch it for you
   return {
+    source: live ? "google_flights" : "simulated",
+    priceLevel: live?.priceLevel,
+    typicalRange: live?.typicalRange,
+    volatilityPct,
+    fetchedAt: live?.fetchedAt,
     verdict,
     currentFare: current,
     expectedFare,

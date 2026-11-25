@@ -1,5 +1,6 @@
 import { AIRPORT_TO_STATION_MIN, cab, cityByCode, flights, trains, type Mode } from "./seed.ts";
 import { defaultFareModel, fareOn, type FareModel } from "./fares.ts";
+import type { LiveFlight } from "../integrations/googleFlights.ts";
 
 export interface Trip {
   origin?: string; // city code
@@ -39,6 +40,8 @@ export interface PlanSettings {
   bufferMin: number; // min connection buffer flight→train
   fareModel: FareModel;
   today: Date;
+  /** Real schedules + prices from Google Flights, keyed "FROM-TO-YYYY-MM-DD". Missing keys use the simulated timetable. */
+  live?: Map<string, LiveFlight[]>;
 }
 
 const IST = "+05:30";
@@ -52,15 +55,42 @@ const cabMin = (km: number) => Math.round((km / cab.kmh) * 60);
 
 function flightsOn(from: string, to: string, date: string, s: PlanSettings) {
   const r = flights.find((f) => f.from === from && f.to === to);
+  const live = s.live?.get(`${from}-${to}-${date}`);
+  if (live?.length) {
+    // nonstop first, then the cheapest few, so the planner sees realistic choices without 30 near-duplicates
+    const picks = [...live].sort((a, b) => a.stops - b.stops || a.price - b.price).slice(0, 8);
+    return picks.map((f) => ({
+      depart: f.depart,
+      arrive: f.arrive,
+      name: `${f.airline} ${f.flightNumber}`.trim() + (f.stops ? ` (${f.stops} stop)` : ""),
+      fare: f.price,
+      baseFare: r?.baseFare ?? f.price,
+      note: "live fare · Google Flights",
+    }));
+  }
   if (!r) return [];
+  const simFare = (d: string, dt: string) => fareOn(r.baseFare, dt, s.today, s.fareModel, `${from}${to}${d}`);
+  // If we have real Google fares for this route on another date (e.g. the requested date while this is a ±flex day),
+  // scale the simulated fares to real market level, so a cheap model fare can't beat real ones unfairly.
+  let ratio = 1;
+  let calibrated = false;
+  for (const [k, lv] of s.live ?? []) {
+    if (!k.startsWith(`${from}-${to}-`) || !lv.length) continue;
+    const liveDate = k.slice(`${from}-${to}-`.length);
+    const simMin = Math.min(...r.deps.map((d) => simFare(d, liveDate)));
+    ratio = Math.min(...lv.map((f) => f.price)) / simMin;
+    calibrated = true;
+    break;
+  }
   return r.deps.map((d, i) => {
     const depart = at(date, d);
     return {
       depart,
       arrive: depart + r.durMin * MIN,
       name: `${r.airline[i % r.airline.length]} ${from}→${to}`,
-      fare: fareOn(r.baseFare, date, s.today, s.fareModel, `${from}${to}${d}`),
+      fare: Math.round((simFare(d, date) * ratio) / 10) * 10,
       baseFare: r.baseFare,
+      note: calibrated ? "estimated · scaled to live Google Flights prices" : "simulated fare",
     };
   });
 }

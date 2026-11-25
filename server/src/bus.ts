@@ -5,7 +5,7 @@ import { db } from "./db.ts";
 export const bus = new EventEmitter();
 bus.setMaxListeners(500);
 
-export type TraceKind = "sarvam" | "flagsmith" | "twilio" | "engine" | "pool" | "nudgebee" | "watcher" | "surge";
+export type TraceKind = "sarvam" | "flagsmith" | "twilio" | "flights" | "engine" | "pool" | "nudgebee" | "watcher" | "surge";
 
 /** Record what a sponsor tool / subsystem did, for the behind-the-scenes panel and /ops. */
 export function trace(kind: TraceKind, convId: string | null, data: Record<string, unknown>) {

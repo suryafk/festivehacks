@@ -2,6 +2,7 @@ import type { Trace } from "./api";
 
 const META: Record<string, { label: string; color: string }> = {
   sarvam: { label: "Sarvam AI", color: "bg-indigo-100 text-indigo-800" },
+  flights: { label: "Google Flights", color: "bg-blue-100 text-blue-800" },
   flagsmith: { label: "Flagsmith", color: "bg-sky-100 text-sky-800" },
   nudgebee: { label: "NudgeBee", color: "bg-amber-100 text-amber-900" },
   twilio: { label: "WhatsApp", color: "bg-green-100 text-green-800" },
@@ -30,6 +31,8 @@ function summary(t: Trace): string {
       if (d.step === "fare advice") return `Fare advice: ${d.verdict} at ₹${d.currentFare} (copy variant ${d.abVariant})`;
       if (d.step === "reply") return `Reply → stage ${d.stage}${d.wasVoice ? " (voice)" : ""}`;
       return JSON.stringify(d).slice(0, 160);
+    case "flights":
+      return d.cached ? `Live fares ${d.route} ${d.date} (cached): ${d.flights} flights, ${d.historyDays} days of history` : `Live fares ${d.route} ${d.date}: ${d.flights} flights, lowest ₹${d.lowest} (${d.level ?? "?"}), ${d.historyDays} days of history (${d.ms} ms)`;
     case "pool":
       return d.event === "pool matched" ? `Matched by ${d.by}: ${d.members?.join(", ")} · ₹${d.totalFare}` : `${d.event}${d.name ? ": " + d.name : ""}`;
     case "twilio":

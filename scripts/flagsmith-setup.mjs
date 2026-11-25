@@ -17,13 +17,22 @@ const flags = [
   { name: "whatsapp_channel_enabled", enabled: true, description: "Kill switch for the WhatsApp channel" },
   { name: "judge_controls", enabled: true, description: "Show demo controls (surge simulator, simulate rider) on the live site" },
   { name: "degrade_gracefully", enabled: false, description: "Flipped ON by NudgeBee during a surge: watchers take small batches at a slower pace" },
+  { name: "live_fares_enabled", enabled: true, description: "Use live Google Flights fares (SerpApi). Turn off to save the 250/month search quota; falls back to the simulated model" },
   { name: "book_nudge_copy", enabled: true, value: "urgent", description: "A/B test: 'urgent' vs 'savings' copy on the book-now nudge (make it multivariate 50/50)" },
   { name: "fare_model", enabled: true, value: JSON.stringify({ festiveSurgePct: 38, festiveWindowDays: 5, sweetSpotDays: [21, 45], lastMinutePct: 70 }), description: "Remote config for the fare forecast" },
   { name: "split_weights", enabled: true, value: JSON.stringify({ maxRiders: 4, windowMin: 60, corridorDeg: 35, detourKmPerStop: 6 }), description: "Remote config for pool matching + fare split" },
   { name: "watcher_config", enabled: true, value: JSON.stringify({ batchSize: 50, intervalMs: 3000 }), description: "Pool watcher batch size + poll interval" },
 ];
 
-const h = { Authorization: `Api-Key ${KEY}`, "Content-Type": "application/json" };
+// Accept either an organisation Master API key ("Api-Key …") or a personal API token ("Token …").
+let h = { Authorization: `Api-Key ${KEY}`, "Content-Type": "application/json" };
+if ((await fetch(`${BASE}/projects/${PROJECT}/`, { headers: h })).status === 401) h = { ...h, Authorization: `Token ${KEY}` };
+const probe = await fetch(`${BASE}/projects/${PROJECT}/`, { headers: h });
+if (!probe.ok) {
+  console.error(`Flagsmith rejected the key for project ${PROJECT} (HTTP ${probe.status}). Check FLAGSMITH_ADMIN_API_KEY / FLAGSMITH_PROJECT_ID.`);
+  process.exit(1);
+}
+console.log(`Using ${h.Authorization.split(" ")[0]} auth for project ${PROJECT}\n`);
 const existing = await fetch(`${BASE}/projects/${PROJECT}/features/?page_size=100`, { headers: h }).then((r) => r.json());
 const have = new Set((existing.results ?? []).map((f) => f.name));
 
