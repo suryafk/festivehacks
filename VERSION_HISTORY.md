@@ -8,15 +8,19 @@ Running log of every change, newest first. Each entry says what changed, how it 
 - Add an entry here for every change.
 
 **Live:** https://34-93-164-65.sslip.io (GCP, project `project-d549298b-2c05-4b94-b8e`, VM `marg-bandhu`, `asia-south1-a`, k3s).
-**Currently deployed commit:** `f1227cc` (v0.6)
+**Currently deployed commit:** `c6c75d3` (v0.7)
 
 ---
 
-## Merge · 2026-11-25 · `travel-theme` → `main` · not deployed
+## v0.7 · 2026-11-25 · `c6c75d3` · deployed
+**Deployed on request: the travel-theme merge** (generic travel theme, English-only name, results in trip order, more seeded trains; details in the three entries below, now all deployed).
+- Live checks after deploy: healthz shows all sponsors true. The served bundle `index-DBkubiXk.js` is identical to the locally verified build, and the theme colour is `#0b1d36` (new theme). Bengaluru → Gonda plans with live Google Flights (₹7,935). Bengaluru → Mumbai by train → Direct train ₹1,560 (new seeded route). Nepal → "only trips within India". 2 watchers alive; flags from Flagsmith. Browser: the new landing renders on the live site.
+
+### Merge · `travel-theme` → `main`
 - Merged branch `travel-theme` (2 commits, the two "Unreleased" entries below) into `main`. Only `VERSION_HISTORY.md` conflicted: kept both sides, with travel-theme's entries on top as Unreleased, then main's v0.6 deploy record, and the duplicated "fare pointer" heading kept once. All code merged automatically.
 - Verified locally after the merge: `npm test` 20/20, web `tsc` clean + build OK. Browser: the new theme's landing renders; the Plan demo (Bengaluru → Gonda) shows the new result order (Ways to get there → cab mates → Should you book) with the live Google Flights badge; every API request returns 200.
 
-## Unreleased · 2026-11-25 · landing name, result order, more trains · not deployed
+### landing name, result order, more trains
 - **Landing:** the name is shown in English only (Hindi "मार्ग बंधु" removed from the hero and footer). The feature cards say "Multilingual · 22 Indian languages", and the fare and cab-mates cards mention replies and alerts in your language.
 - **Plan results order:** Ways to get there → Find cab mates → Should you book (was cab mates → fare → ways). Route notes stay just above the options.
 - **Trains (simulated timetables, both directions):** Bengaluru ⇄ Mumbai, Bengaluru ⇄ Pune, Pune ⇄ Mumbai, Hyderabad ⇄ Jhansi, Jamshedpur (Tatanagar) ⇄ Mumbai. 26 trains in all, some running on set weekdays only.
@@ -24,7 +28,7 @@ Running log of every change, newest first. Each entry says what changed, how it 
   - The "no train data" note no longer says "UP and Bihar only".
 - **Verified locally:** `npm test` 20/20, web `tsc` clean, and train-only plans for all 10 directions (incl. Hindi "झाँसी से हैदराबाद"). UI to be checked by the owner.
 
-## Unreleased · 2026-11-25 · generic travel theme · not deployed
+### generic travel theme
 - **Why:** the platform is for any trip in India. The festive rush is a feature (and the Ops demo), not the whole identity.
 - **Palette** (`web/src/index.css`): marigold / vermilion / maroon-night are replaced by navy `#0b1d36`, paper `#f6f9fc`, mist, ocean-blue `brand` `#1e5bd8` (actions, headings, kickers), and `sky` `#5cc8ff` (highlight on dark, with navy text). Red `danger` `#d93025` now only marks errors, recording, "dearer" and OOMKilled. Teal `leaf` is kept for good news. Tokens and inline SVG/hex colours were renamed across every page.
 - **Type:** Plus Jakarta Sans for headings (was the Fraunces serif); Mukta for Devanagari (was Tiro).
