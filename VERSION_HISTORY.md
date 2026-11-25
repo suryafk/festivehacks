@@ -8,12 +8,26 @@ Running log of every change, newest first. Each entry says what changed, how it 
 - Add an entry here for every change.
 
 **Live:** https://34-93-164-65.sslip.io (GCP, project `project-d549298b-2c05-4b94-b8e`, VM `marg-bandhu`, `asia-south1-a`, k3s).
-**Currently deployed commit:** `c51f763` (v0.3.2)
+**Currently deployed commit:** `0d9a676` (v0.4)
 
 ---
 
-## Unreleased
-- Added this `VERSION_HISTORY.md`. Not committed or deployed.
+## v0.4 · 2026-11-25 · `0d9a676` · deployed
+**Live sponsor keys + Google Flights live fares**
+- The VM `.env` now holds the Sarvam, Flagsmith (server key), Twilio and SerpApi keys. The Flagsmith admin token and project ID are deliberately **not** on the server (only scripts on the laptop use them).
+- Verified on the live site:
+  - `/healthz` shows sarvam, flagsmith and twilio all true.
+  - Sarvam-105B parsed a Hindi sentence into the form (BLR→GD, 26 Dec, ±2, all modes).
+  - The plan uses **live Google Flights**: ₹7,935 now vs typical ₹7,900 (₹6,500–₹9,300), Google "typical", verdict "Let us watch it". Recommended trip IndiGo 6E 6596 (live fare); 5 cab mates waiting.
+  - Bulbul voice reply served (HTTP 200, ~580 KB WAV).
+  - 2 watchers alive, flags from Flagsmith, `degrade_gracefully` off.
+  - The browser shows the "● Live · Google Flights" badge.
+- SerpApi quota after deploy: 249/250 left. SerpApi served the repeat query from its own cache.
+- Includes everything previously listed under "Unreleased" below.
+- **To finish WhatsApp:** in the Twilio console set Sandbox → "When a message comes in" = `https://34-93-164-65.sslip.io/webhooks/whatsapp` (POST), then message the sandbox from a joined phone.
+
+### Changes included in v0.4 (previously "Unreleased")
+- Added this `VERSION_HISTORY.md`.
 - **GCP (infra):** enabled the Monitoring, Logging, Recommender, Cloud Resource Manager, BigQuery and IAM APIs. Created service account `nudgebee-sa@project-d549298b-2c05-4b94-b8e.iam.gserviceaccount.com` with read-only roles (viewer, monitoring.viewer, logging.viewer, bigquery.dataViewer, bigquery.jobUser, recommender.viewer, serviceusage.serviceUsageConsumer).
   - **JSON key NOT created:** the organization policy `iam.disableServiceAccountKeyCreation` is enforced on org `758008451110`. Left in place; it's a security control, and changing it is the owner's call.
   - `.gitignore` now ignores `*-sa-key.json`.
