@@ -8,11 +8,17 @@ Running log of every change, newest first. Each entry says what changed, how it 
 - Add an entry here for every change.
 
 **Live:** https://34-93-164-65.sslip.io (GCP, project `project-d549298b-2c05-4b94-b8e`, VM `marg-bandhu`, `asia-south1-a`, k3s).
-**Currently deployed commit:** `0d9a676` (v0.4)
+**Currently deployed commit:** `e920e1c` (v0.5)
 
 ---
 
-## Unreleased (verified locally, not deployed)
+## v0.5 · 2026-11-25 · `e920e1c` · deployed
+**Verified on the live site after deploy:**
+- Nepal/Ahmedabad (web parse + engine) → "माफ़ कीजिए, अहमदाबाद और नेपाल अभी मार्ग बंधु पर उपलब्ध नहीं है…".
+- A normal trip still plans with live Google Flights (₹7,935).
+- A simulated WhatsApp inbound produced a PLAN_READY reply sent as **2 messages** (detailed format); Twilio refused only the deliberate dummy number.
+- `/#/plan?c=…` serves (HTTP 200).
+
 **WhatsApp confirmed live:** the user's text message produced a plan with live Google Flights fares (BLR→LKO 5 Dec, IndiGo 6E 903, "Wait a little") and Twilio accepted the reply (201).
 
 **Fix: "Nepal → Ahmedabad" (Hindi voice) gave "couldn't find a route with those modes"**
