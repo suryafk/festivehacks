@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 
 const FEATURES = [
   {
-    kicker: "Speak, don't fill forms",
+    kicker: "Multilingual · 22 Indian languages",
     title: "Tell it in your own language",
-    body: "“26 दिसंबर के आसपास बेंगलुरु से गोंडा जाना है.” Type it or say it in Hindi, Bhojpuri-flavoured Hinglish, Tamil or 20 other languages. Sarvam AI understands it and answers back out loud.",
-    tag: "Sarvam AI · Saaras + Bulbul",
+    body: "“26 दिसंबर के आसपास बेंगलुरु से गोंडा जाना है.” Type it or say it in Hindi, English, Hinglish, Tamil, Bengali or any of 22 Indian languages. Sarvam AI understands it, and the plan comes back in your language, spoken out loud too.",
+    tag: "Multilingual · Sarvam AI Saaras + Bulbul",
     visual: "voice",
   },
   {
@@ -18,14 +18,14 @@ const FEATURES = [
   {
     kicker: "Book now or wait?",
     title: "Fare prediction you can act on",
-    body: "See today's best price next to 60 days of real price history for your route, how often it has dropped from this level, and a clear pointer: book now, or let us watch it and ping you.",
+    body: "See today's best price next to 60 days of real price history for your route, how often it has dropped from this level, and a clear pointer explained in your own language: book now, or let us watch it and ping you.",
     tag: "Price watch + alerts",
     visual: "fare",
   },
   {
     kicker: "The last 200 km",
     title: "Find your cab mates",
-    body: "See every Marg Bandhu landing at the same airport around your time, heading your way, on a map. Share the cab and split the fare fairly: you pay only for the road you ride.",
+    body: "See every Marg Bandhu landing at the same airport around your time, heading your way, on a map. Share the cab and split the fare fairly: you pay only for the road you ride. Alerts reach you on WhatsApp, in your language.",
     tag: "Pooling + fair split",
     visual: "pool",
   },
@@ -209,10 +209,7 @@ export default function Landing() {
             <p className="inline-flex items-center gap-2 rounded-full border border-paper/15 bg-paper/5 px-3 py-1 text-xs font-medium tracking-wide text-paper/80">
               <span className="h-1.5 w-1.5 rounded-full bg-sky" /> Door to door · anywhere in India · 22+ languages
             </p>
-            <h1 className="mt-6 font-display text-6xl font-extrabold leading-[0.95] tracking-tighter md:text-7xl">
-              Marg Bandhu
-              <span className="mt-3 block font-deva text-4xl font-normal text-sky md:text-5xl">मार्ग बंधु</span>
-            </h1>
+            <h1 className="mt-6 font-display text-6xl font-extrabold leading-[0.95] tracking-tighter md:text-7xl">Marg Bandhu</h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-paper/80">
               A trip across India shouldn't take three apps and a prayer. Tell us where and when, in your own language. We plan the flight, the train and the cab, tell you <em className="not-italic text-paper">when</em> to book, and find people to split the last mile with.
             </p>

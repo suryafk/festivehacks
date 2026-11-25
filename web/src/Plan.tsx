@@ -256,21 +256,22 @@ export default function Plan({ convId, cfg, notify, demo }: { convId: string | n
               </div>
               {result?.audioUrl && <audio controls src={result.audioUrl} className="h-9" />}
             </div>
-            {pool && <div className="rise"><CabTeaser card={pool} onFind={() => { location.hash = "#/cabmates"; }} /></div>}
+            {plan.notes?.length > 0 && (
+              <ul className="rise space-y-1 rounded-2xl bg-mist/70 px-4 py-3 text-sm text-ink/80">
+                {plan.notes.map((n: string) => <li key={n}>{n}</li>)}
+              </ul>
+            )}
+            {/* order: how to get there, then the last mile, then when to book */}
+            <div className="rise"><Itineraries card={plan} /></div>
+            {pool && <div className="rise" style={{ animationDelay: "60ms" }}><CabTeaser card={pool} onFind={() => { location.hash = "#/cabmates"; }} /></div>}
             {fare && (
-              <div className="rise" style={{ animationDelay: "60ms" }}>
+              <div className="rise" style={{ animationDelay: "120ms" }}>
                 <FlightPriceCard card={fare} watch={watch} judge={Boolean(cfg?.judgeControls)}
                   onBook={() => { convId && api.track(convId, "book_cta_click", fare.variant); notify("This would hand off to the airline or an OTA to book (demo)."); }}
                   onWatch={async () => { if (!convId) return; try { setWatch(await api.watchFare(convId, fare.advice.currentFare)); notify("Watching this fare. We'll alert you here" + (waLinked ? " and on WhatsApp." : ".")); } catch (e) { notify(String(e)); } }}
                   onSimulateDrop={() => convId && api.simulateDrop(convId).then(() => api.getWatch(convId).then(setWatch))} />
               </div>
             )}
-            {plan.notes?.length > 0 && (
-              <ul className="rise space-y-1 rounded-2xl bg-mist/70 px-4 py-3 text-sm text-ink/80">
-                {plan.notes.map((n: string) => <li key={n}>{n}</li>)}
-              </ul>
-            )}
-            <div className="rise" style={{ animationDelay: "120ms" }}><Itineraries card={plan} /></div>
             {cfg?.whatsapp && !waLinked && (
               <form className="flex flex-wrap items-center gap-3 rounded-3xl border border-leaf/30 bg-leaf-soft/60 p-4 text-sm" onSubmit={(e) => { e.preventDefault(); convId && api.linkWhatsApp(convId, phone).then(() => { setWaLinked(true); notify("WhatsApp linked."); }).catch((er) => notify(String(er))); }}>
                 <span className="font-semibold">📱 Also send alerts to WhatsApp</span>

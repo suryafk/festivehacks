@@ -151,7 +151,7 @@ function Footer({ cfg }: { cfg: Config | null }) {
     <footer className="bg-navy text-paper/75">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
-          <div className="flex items-center gap-2 text-paper"><Logo size={30} /><span className="font-display text-2xl font-bold tracking-tight">Marg Bandhu</span><span className="font-deva text-lg text-sky">मार्ग बंधु</span></div>
+          <div className="flex items-center gap-2 text-paper"><Logo size={30} /><span className="font-display text-2xl font-bold tracking-tight">Marg Bandhu</span></div>
           <p className="mt-3 max-w-sm text-sm leading-relaxed">Your travel companion across India: one plan from your door to your destination, in your own language.</p>
           <a href="#/plan" className="mt-5 inline-flex rounded-full bg-sky px-5 py-2.5 text-sm font-semibold text-navy">Plan a trip with us →</a>
         </div>

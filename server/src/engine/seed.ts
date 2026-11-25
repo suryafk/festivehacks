@@ -62,6 +62,10 @@ export const cities: City[] = [
   { code: "JNU", name: "Jaunpur", aliases: ["jaunpur", "जौनपुर"], kind: "town", hub: "VNS", kmFromHub: 70, lat: 25.75, lng: 82.69 },
   { code: "GZP", name: "Ghazipur", aliases: ["ghazipur", "गाज़ीपुर", "गाजीपुर"], kind: "town", hub: "VNS", kmFromHub: 80, lat: 25.58, lng: 83.58 },
   { code: "MZP", name: "Mirzapur", aliases: ["mirzapur", "मिर्ज़ापुर", "मिर्जापुर"], kind: "town", hub: "VNS", kmFromHub: 75, lat: 25.15, lng: 82.57 },
+
+  // towns with seeded long-distance trains (no airport of their own)
+  { code: "JHS", name: "Jhansi", aliases: ["jhansi", "झाँसी", "झांसी"], kind: "town", hub: "GWL", kmFromHub: 105, lat: 25.45, lng: 78.57 },
+  { code: "TATA", name: "Jamshedpur", aliases: ["jamshedpur", "tatanagar", "जमशेदपुर", "टाटानगर"], kind: "town", hub: "IXR", kmFromHub: 130, lat: 22.8, lng: 86.2 },
 ];
 
 for (const c of cities) c.source = "seed";
@@ -126,6 +130,34 @@ export const trains: TrainLeg[] = [
   { name: "Bengaluru–Lucknow Express", from: "BLR", to: "LKO", dep: "13:25", durMin: 2460, fare: 2780, days: [1, 4] },
   { name: "Delhi–Gorakhpur Humsafar", from: "DEL", to: "GKP", dep: "17:00", durMin: 780, fare: 1680 },
   { name: "Delhi–Lucknow Shatabdi", from: "DEL", to: "LKO", dep: "06:10", durMin: 390, fare: 1450 },
+
+  // Bengaluru ⇄ Mumbai
+  { name: "Udyan Express", from: "BLR", to: "BOM", dep: "20:00", durMin: 1555, fare: 1560 },
+  { name: "Bengaluru–LTT Superfast", from: "BLR", to: "BOM", dep: "15:30", durMin: 1440, fare: 1620, days: [2, 5] },
+  { name: "Udyan Express", from: "BOM", to: "BLR", dep: "08:05", durMin: 1495, fare: 1560 },
+  { name: "LTT–Bengaluru Superfast", from: "BOM", to: "BLR", dep: "22:30", durMin: 1440, fare: 1620, days: [3, 6] },
+  // Bengaluru ⇄ Pune
+  { name: "Udyan Express", from: "BLR", to: "PNQ", dep: "20:00", durMin: 1200, fare: 1340 },
+  { name: "Coimbatore–LTT Express", from: "BLR", to: "PNQ", dep: "12:10", durMin: 1150, fare: 1380, days: [1, 4] },
+  { name: "Udyan Express", from: "PNQ", to: "BLR", dep: "11:25", durMin: 1180, fare: 1340 },
+  { name: "Pune–Bengaluru Superfast", from: "PNQ", to: "BLR", dep: "18:45", durMin: 1150, fare: 1380, days: [3, 6] },
+  // Pune ⇄ Mumbai
+  { name: "Deccan Queen", from: "PNQ", to: "BOM", dep: "07:15", durMin: 195, fare: 455 },
+  { name: "Sinhagad Express", from: "PNQ", to: "BOM", dep: "06:05", durMin: 220, fare: 390 },
+  { name: "Pragati Express", from: "PNQ", to: "BOM", dep: "15:15", durMin: 210, fare: 420 },
+  { name: "Deccan Queen", from: "BOM", to: "PNQ", dep: "17:10", durMin: 195, fare: 455 },
+  { name: "Intercity Express", from: "BOM", to: "PNQ", dep: "06:40", durMin: 200, fare: 420 },
+  { name: "Pragati Express", from: "BOM", to: "PNQ", dep: "16:25", durMin: 210, fare: 420 },
+  // Hyderabad ⇄ Jhansi
+  { name: "Telangana Express", from: "HYD", to: "JHS", dep: "06:00", durMin: 1125, fare: 1650 },
+  { name: "Dakshin Express", from: "HYD", to: "JHS", dep: "23:00", durMin: 1240, fare: 1580 },
+  { name: "Telangana Express", from: "JHS", to: "HYD", dep: "09:40", durMin: 1140, fare: 1650 },
+  { name: "Dakshin Express", from: "JHS", to: "HYD", dep: "17:30", durMin: 1250, fare: 1580 },
+  // Jamshedpur (Tatanagar) ⇄ Mumbai
+  { name: "Gitanjali Express", from: "TATA", to: "BOM", dep: "16:20", durMin: 1680, fare: 1990 },
+  { name: "Tata–LTT Express", from: "TATA", to: "BOM", dep: "07:45", durMin: 1620, fare: 1940, days: [0, 3] },
+  { name: "Gitanjali Express", from: "BOM", to: "TATA", dep: "06:00", durMin: 1680, fare: 1990 },
+  { name: "LTT–Tata Express", from: "BOM", to: "TATA", dep: "21:10", durMin: 1620, fare: 1940, days: [2, 5] },
 ];
 
 export const AIRPORT_TO_STATION_MIN: Record<string, number> = { LKO: 40, PAT: 30, VNS: 45 };

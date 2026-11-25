@@ -12,6 +12,14 @@ Running log of every change, newest first. Each entry says what changed, how it 
 
 ---
 
+## Unreleased · 2026-11-25 · landing name, result order, more trains · not deployed
+- **Landing:** the name is shown in English only (Hindi "मार्ग बंधु" removed from the hero and footer). The feature cards say "Multilingual · 22 Indian languages", and the fare and cab-mates cards mention replies and alerts in your language.
+- **Plan results order:** Ways to get there → Find cab mates → Should you book (was cab mates → fare → ways). Route notes stay just above the options.
+- **Trains (simulated timetables, both directions):** Bengaluru ⇄ Mumbai, Bengaluru ⇄ Pune, Pune ⇄ Mumbai, Hyderabad ⇄ Jhansi, Jamshedpur (Tatanagar) ⇄ Mumbai. 26 trains in all, some running on set weekdays only.
+  - New seed towns: Jhansi `JHS` (via Gwalior airport, 105 km) and Jamshedpur `TATA` (via Ranchi, 130 km), with Hindi aliases.
+  - The "no train data" note no longer says "UP and Bihar only".
+- **Verified locally:** `npm test` 20/20, web `tsc` clean, and train-only plans for all 10 directions (incl. Hindi "झाँसी से हैदराबाद"). UI to be checked by the owner.
+
 ## Unreleased · 2026-11-25 · generic travel theme · not deployed
 - **Why:** the platform is for any trip in India. The festive rush is a feature (and the Ops demo), not the whole identity.
 - **Palette** (`web/src/index.css`): marigold / vermilion / maroon-night are replaced by navy `#0b1d36`, paper `#f6f9fc`, mist, ocean-blue `brand` `#1e5bd8` (actions, headings, kickers), and `sky` `#5cc8ff` (highlight on dark, with navy text). Red `danger` `#d93025` now only marks errors, recording, "dearer" and OOMKilled. Teal `leaf` is kept for good news. Tokens and inline SVG/hex colours were renamed across every page.
