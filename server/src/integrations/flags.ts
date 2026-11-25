@@ -65,7 +65,10 @@ export async function getFlags(identity?: string, traits: Record<string, string 
   if (client) {
     try {
       const fl = identity ? await client.getIdentityFlags(identity, traits) : await client.getEnvironmentFlags();
+      // The SDK answers `false` for a flag that doesn't exist in Flagsmith (yet); use our default for those.
+      const exists = new Set(fl.allFlags().map((x) => x.featureName));
       const bool = (k: keyof Flags) => {
+        if (!exists.has(k)) return defaults[k as keyof typeof defaults] as boolean;
         try {
           return fl.isFeatureEnabled(k);
         } catch {
