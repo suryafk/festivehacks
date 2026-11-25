@@ -23,10 +23,11 @@ interface Row {
 const toRider = (r: Row): Rider => ({ id: r.id, name: r.name, hub: r.hub, town: r.town, arriveAt: r.arrive_at, dropKm: r.drop_km });
 
 export function ensureSeedRiders(hub: string, arriveAt: number) {
-  const existing = db.prepare("SELECT COUNT(*) n FROM pool_requests WHERE synthetic = 1 AND hub = ? AND status = 'waiting' AND ABS(arrive_at - ?) < 7200000").get(hub, arriveAt) as { n: number };
-  if (existing.n > 0) return;
+  // Keep every seeded traveller "around" this arrival time (refills after they get matched, so each visitor sees a lively map).
+  const has = db.prepare("SELECT 1 FROM pool_requests WHERE synthetic = 1 AND hub = ? AND name = ? AND status = 'waiting' AND ABS(arrive_at - ?) < 10800000");
   const ins = db.prepare("INSERT INTO pool_requests (id, conv_id, name, hub, town, arrive_at, drop_km, synthetic, created) VALUES (?,?,?,?,?,?,?,1,?)");
-  for (const s of seedRiders.filter((s) => s.hub === hub)) ins.run(uid(), null, s.name, s.hub, s.to, arriveAt + s.arriveOffsetMin * 60_000, s.dropKm, Date.now());
+  for (const s of seedRiders.filter((s) => s.hub === hub))
+    if (!has.get(hub, s.name, arriveAt)) ins.run(uid(), null, s.name, s.hub, s.to, arriveAt + s.arriveOffsetMin * 60_000, s.dropKm, Date.now());
 }
 
 export function waitingNear(hub: string, arriveAt: number, windowMin: number): Row[] {
