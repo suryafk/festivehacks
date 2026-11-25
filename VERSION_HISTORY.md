@@ -12,15 +12,24 @@ Running log of every change, newest first. Each entry says what changed, how it 
 
 ---
 
-## v0.7 · 2026-11-25 · `c6c75d3` · deployed
-**Deployed on request: the travel-theme merge** (generic travel theme, English-only name, results in trip order, more seeded trains; details in the three entries below, now all deployed).
-- Live checks after deploy: healthz shows all sponsors true. The served bundle `index-DBkubiXk.js` is identical to the locally verified build, and the theme colour is `#0b1d36` (new theme). Bengaluru → Gonda plans with live Google Flights (₹7,935). Bengaluru → Mumbai by train → Direct train ₹1,560 (new seeded route). Nepal → "only trips within India". 2 watchers alive; flags from Flagsmith. Browser: the new landing renders on the live site.
+## Docs · 2026-11-25 · README rewritten for everyone · no deploy needed
+- `README.md` is written for non-technical readers first. Sections:
+  - vision;
+  - what it does, in plain words;
+  - a step-by-step guide for the website and WhatsApp (commands, languages, places);
+  - each sponsor in detail: the five Sarvam models and how the AI is kept honest; every Flagsmith flag and what it controls (A/B test, segments, remote settings, kill switches, `degrade_gracefully`); NudgeBee's detect → diagnose → approve → scale + Flagsmith → report loop and the Ops rehearsal;
+  - real vs simulated, plus the backtest result;
+  - Rohit's user journey (Mermaid journey + step by step);
+  - technical architecture (Mermaid flowchart, request flow, building blocks, fallbacks);
+  - developer setup and deploy at the end.
+- Corrected claims to match the code and current features:
+  - any place in India (was 4 metros → UP/Bihar);
+  - the fare pointer is history-based (no forecast);
+  - languages are understood in 22 + English (Saaras) and spoken in 11 (Bulbul);
+  - no festive branding.
+- Both Mermaid diagrams were checked by hand only: automatic rendering in a headless browser was blocked, because it needed Mermaid from a CDN. Check them on GitHub.
 
-### Merge · `travel-theme` → `main`
-- Merged branch `travel-theme` (2 commits, the two "Unreleased" entries below) into `main`. Only `VERSION_HISTORY.md` conflicted: kept both sides, with travel-theme's entries on top as Unreleased, then main's v0.6 deploy record, and the duplicated "fare pointer" heading kept once. All code merged automatically.
-- Verified locally after the merge: `npm test` 20/20, web `tsc` clean + build OK. Browser: the new theme's landing renders; the Plan demo (Bengaluru → Gonda) shows the new result order (Ways to get there → cab mates → Should you book) with the live Google Flights badge; every API request returns 200.
-
-### landing name, result order, more trains
+## Unreleased · 2026-11-25 · landing name, result order, more trains · not deployed
 - **Landing:** the name is shown in English only (Hindi "मार्ग बंधु" removed from the hero and footer). The feature cards say "Multilingual · 22 Indian languages", and the fare and cab-mates cards mention replies and alerts in your language.
 - **Plan results order:** Ways to get there → Find cab mates → Should you book (was cab mates → fare → ways). Route notes stay just above the options.
 - **Trains (simulated timetables, both directions):** Bengaluru ⇄ Mumbai, Bengaluru ⇄ Pune, Pune ⇄ Mumbai, Hyderabad ⇄ Jhansi, Jamshedpur (Tatanagar) ⇄ Mumbai. 26 trains in all, some running on set weekdays only.
