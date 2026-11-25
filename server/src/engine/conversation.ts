@@ -4,11 +4,13 @@ import { trace } from "../bus.ts";
 import { getFlags, rushKnobs } from "../integrations/flags.ts";
 import { textToSpeech, translate } from "../integrations/sarvam.ts";
 import { extractIntent, detectLang } from "./intent.ts";
-import { plan, type Itinerary, type Trip } from "./planner.ts";
+import { plan, airportFor, routeFor, type Itinerary, type Trip } from "./planner.ts";
 import { adviseFare } from "./fares.ts";
+import { explainFare } from "./fareExplain.ts";
 import { t, langKey, cityName, rupee } from "./i18n.ts";
 import { createWatch } from "./fareWatch.ts";
-import { cityByCode, flights as seedFlights, type Mode } from "./seed.ts";
+import { cityByCode, type Mode } from "./seed.ts";
+import { resolvePlace, namesFor, withHub, type Resolved } from "./places.ts";
 import { addSimulatedRider, createRequest, ensureSeedRiders, poolOf, previewCount, waitingNear } from "./pools.ts";
 import { splitFare, compatible } from "./pooling.ts";
 import { getLiveFares, type LiveFlight } from "../integrations/googleFlights.ts";
@@ -44,6 +46,21 @@ export interface Reply {
 }
 
 const MODE_CHIPS = ["✈️ Flight", "🚆 Train", "🚕 Cab", "Any"];
+const EXAMPLES = ["Bengaluru to Gonda around 26 Dec", "Delhi to Shimla 28 Dec", "Mumbai to Darbhanga 2 Jan"];
+
+type Missing = Extract<Resolved, { ok: false }>;
+
+/** Free-text place names from the intent (Sarvam or the fallback parser) → place codes. */
+async function resolveNames(intent: { origin?: string; destination?: string; originName?: string; destinationName?: string }, convId: string): Promise<Missing[]> {
+  const missing: Missing[] = [];
+  for (const [k, nk] of [["origin", "originName"], ["destination", "destinationName"]] as const) {
+    if (intent[k] || !intent[nk]) continue;
+    const r = await resolvePlace(intent[nk]!, convId);
+    if (r.ok) intent[k] = r.city.code;
+    else missing.push(r);
+  }
+  return missing;
+}
 
 export async function handle(conv: ConvRow, input: Input): Promise<Reply> {
   const today = new Date();
@@ -72,19 +89,31 @@ export async function handle(conv: ConvRow, input: Input): Promise<Reply> {
     out = reply(who ? (l === "hi" ? `(डेमो) ${who} ने आपके रास्ते के लिए पूल जॉइन किया…` : `(demo) ${who} just asked for a pool on your route…`) : "Join a pool first.");
   } else {
     if (a?.type === "set_modes") trip = { ...trip, modes: a.modes };
-    else if (a?.type === "set_trip") trip = sanitizeTrip(a.trip);
+    else if (a?.type === "set_trip") {
+      const r = await sanitizeTrip(a.trip, conv.id);
+      trip = r.trip;
+      if (r.missing.length) {
+        const by = (k: Missing["reason"]) => r.missing.filter((m) => m.reason === k).map((m) => m.name);
+        out = reply(t.placeProblem(l, by("abroad"), by("not_found"), by("lookup_failed")), { stage: "COLLECTING", quickReplies: EXAMPLES });
+        return finish(conv, input, out, lang, trip);
+      }
+    }
     else if (input.text) {
       const intent = await extractIntent(input.text, trip, today, conv.id);
       if (intent.intent === "reset") return handle(conv, { ...input, text: undefined, action: { type: "reset" } });
       if (intent.intent === "join_pool") return handle(conv, { ...input, text: undefined, action: { type: "join_pool" } });
       if (intent.intent === "watch_fare") return handle(conv, { ...input, text: undefined, action: { type: "watch_fare" } });
       if (intent.intent === "help" && !trip.destination) {
-        out = reply(t.welcome(l), { quickReplies: ["Bengaluru to Gonda around 26 Dec", "26 दिसंबर के आसपास बेंगलुरु से गोरखपुर"] });
+        out = reply(t.welcome(l), { quickReplies: ["Bengaluru to Gonda around 26 Dec", "26 दिसंबर के आसपास बेंगलुरु से गोरखपुर", "Delhi to Shimla 28 Dec"] });
         return finish(conv, input, out, lang, trip);
       }
-      if (intent.unknownPlaces?.length) {
-        out = reply(t.notCovered(l, intent.unknownPlaces), { stage: "COLLECTING", quickReplies: ["Bengaluru to Gonda around 26 Dec", "Delhi to Patna 30 Dec"] });
-        trace("engine", conv.id, { step: "not covered", places: intent.unknownPlaces });
+      const missing = await resolveNames(intent, conv.id);
+      if (intent.unknownPlaces?.length || missing.length) {
+        const abroad = [...(intent.unknownPlaces ?? []), ...missing.filter((m) => m.reason === "abroad").map((m) => m.name)];
+        const notFound = missing.filter((m) => m.reason === "not_found").map((m) => m.name);
+        const failed = missing.filter((m) => m.reason === "lookup_failed").map((m) => m.name);
+        out = reply(t.placeProblem(l, abroad, notFound, failed), { stage: "COLLECTING", quickReplies: EXAMPLES });
+        trace("engine", conv.id, { step: "place not found", abroad, notFound });
         return finish(conv, input, out, lang, trip);
       }
       for (const k of ["origin", "destination", "date", "flexDays", "modes", "travellers"] as const)
@@ -122,54 +151,84 @@ async function nextStep(conv: ConvRow, trip: Trip, flags: Awaited<ReturnType<typ
   if (!trip.date) return reply(t.askDate(l, trip.destination), { stage: "COLLECTING", quickReplies: ["24 Dec", "26 Dec", "30 Dec"] });
   if (!trip.modes?.length) return reply(t.askModes(l), { stage: "COLLECTING", quickReplies: MODE_CHIPS, cards: [{ type: "ask-modes" }] });
 
-  // We plan trips from a metro (where people work) to a hub or home town. Say so instead of blaming the modes.
   const o = cityByCode.get(trip.origin);
   const dst = cityByCode.get(trip.destination);
-  if (!o || o.kind !== "metro" || !dst || dst.kind === "metro")
-    return reply(t.coverage(l), { stage: "COLLECTING", quickReplies: ["Bengaluru to Gonda around 26 Dec", "Delhi to Patna 30 Dec"] });
+  if (!o || !dst) return reply(t.askDestination(l), { stage: "COLLECTING", quickReplies: EXAMPLES });
+  withHub(o); // nearest airport + backup airport, however the place was recognised
+  withHub(dst);
+  if (o.code === dst.code) return reply(t.samePlace(l), { stage: "COLLECTING", quickReplies: EXAMPLES });
 
   const knobs = rushKnobs(flags);
 
-  // Live Google Flights data for the main flight leg on the requested date (one cached search; quota-friendly).
-  const destCity = cityByCode.get(trip.destination!);
-  const flyTo = destCity?.kind === "town" ? destCity.hub : destCity?.code;
+  // Which airports to fly between: the nearest suitable ones, then (if Google has no flights there) the backup
+  // airports. At most two live searches per plan, each cached for 6 h (SerpApi free plan = 250 / month).
+  const pairs: [string, string][] = [];
+  const oA = airportFor(o), dA = airportFor(dst);
+  if (oA && dA && oA !== dA) pairs.push([oA, dA]);
+  const alt: [string | undefined, string | undefined] = [o.altHub ?? oA, dst.altHub ?? dA];
+  if (alt[0] && alt[1] && alt[0] !== alt[1] && !pairs.some(([a, b]) => a === alt[0] && b === alt[1])) pairs.push([alt[0], alt[1]]);
   const liveMap = new Map<string, LiveFlight[]>();
+  const noFlights = new Set<string>();
   let liveFares: Awaited<ReturnType<typeof getLiveFares>> = null;
-  if (flags.live_fares_enabled && trip.modes?.includes("flight") && flyTo && flyTo !== trip.origin && trip.origin && trip.date) {
-    liveFares = await getLiveFares(trip.origin!, flyTo, trip.date!, conv.id);
-    if (liveFares) liveMap.set(`${trip.origin}-${flyTo}-${trip.date}`, liveFares.flights);
+  if (flags.live_fares_enabled && trip.modes?.includes("flight") && trip.date) {
+    for (const [a, b] of pairs) {
+      const lf = await getLiveFares(a, b, trip.date, conv.id);
+      if (!lf) break; // API error / no key: simulated fares from here on
+      if (lf.flights.length) { liveFares = lf; liveMap.set(`${a}-${b}-${trip.date}`, lf.flights); break; }
+      noFlights.add(`${a}-${b}`); // Google: no flights on this pair; try the next one, never invent flights here
+    }
   }
+  // first pair that isn't known to be flight-less (the planner skips flights entirely if none is left)
+  const chosen = pairs.find(([a, b]) => !noFlights.has(`${a}-${b}`)) ?? pairs[0];
+  trace("engine", conv.id, { step: "airports", origin: o.name, dest: dst.name, pairs: pairs.map((p) => p.join("→")), chosen: chosen?.join("→"), noFlights: [...noFlights] });
 
-  const its = plan(trip as Required<Pick<Trip, "origin" | "destination" | "date">> & Trip, { bufferMin: knobs.bufferMin, fareModel: flags.fare_model, today, live: liveMap });
+  const its = plan(trip as Required<Pick<Trip, "origin" | "destination" | "date">> & Trip, {
+    bufferMin: knobs.bufferMin, fareModel: flags.fare_model, today, live: liveMap, noFlights,
+    airports: chosen ? { origin: chosen[0], dest: chosen[1] } : undefined,
+  });
   trace("engine", conv.id, { step: "plan", options: its.length, bufferMin: knobs.bufferMin, festive_rush_mode: flags.festive_rush_mode });
   if (!its.length) return reply(t.noRoute(l), { stage: "COLLECTING", quickReplies: MODE_CHIPS, cards: [{ type: "ask-modes" }] });
 
-  const cards: Card[] = [{ type: "plan", trip, itineraries: its, bufferMin: knobs.bufferMin, festiveRush: flags.festive_rush_mode }];
+  // Honest notes about what's estimated or missing on this route.
+  const notes: string[] = [];
+  if (trip.modes?.includes("train") && !its.some((i) => i.legs.some((x) => x.mode === "train"))) notes.push(t.noTrainData(l));
+  if (trip.modes?.includes("flight") && noFlights.size && !its.some((i) => i.flight)) notes.push(t.noFlightsFound(l));
+  const codes = [trip.origin, trip.destination, ...its.flatMap((i) => i.legs.flatMap((x) => [x.from, x.to]))];
+  const cards: Card[] = [{ type: "plan", trip, itineraries: its, bufferMin: knobs.bufferMin, festiveRush: flags.festive_rush_mode, notes, names: namesFor(codes) }];
   const lines = [t.planIntro(l, trip)];
   const best = its[0];
   lines.push(...best.legs.filter((x) => x.mode !== "transfer").map((leg) => `• ${t.legLine(l, leg)}`));
 
   // Price outlook is for the main flight route on the requested date. With live Google data it always uses that,
   // whichever itinerary (possibly a ±flex day) ended up recommended.
-  const seedRoute = flyTo ? seedFlights.find((f) => f.from === trip.origin && f.to === flyTo) : undefined;
-  const fl = liveFares && flyTo
-    ? { from: trip.origin!, to: flyTo, baseFare: seedRoute?.baseFare ?? liveFares.insights.lowestPrice ?? 6000, date: trip.date! }
+  const [flyFrom, flyTo] = chosen ?? [];
+  const seedRoute = flyFrom && flyTo ? routeFor(flyFrom, flyTo) : undefined;
+  const fl = liveFares && flyFrom && flyTo
+    ? { from: flyFrom, to: flyTo, baseFare: seedRoute?.baseFare ?? liveFares.insights.lowestPrice ?? 6000, date: trip.date! }
     : (its.find((i) => i.flight && i.date === trip.date) ?? its.find((i) => i.flight))?.flight;
   if (fl) {
-    const useLive = Boolean(liveFares && fl.date === trip.date && fl.to === flyTo);
+    const useLive = Boolean(liveFares && fl.date === trip.date && fl.to === flyTo && fl.from === flyFrom);
     const lowest = useLive ? liveFares!.insights.lowestPrice ?? Math.min(...liveFares!.flights.map((f) => f.price)) : 0;
     const advice = adviseFare(fl.baseFare, fl.date, today, flags.fare_model, `${fl.from}${fl.to}`, useLive
       ? { lowestPrice: lowest, priceLevel: liveFares!.insights.priceLevel, typicalRange: liveFares!.insights.typicalRange, history: liveFares!.insights.history, fetchedAt: liveFares!.fetchedAt }
       : undefined);
-    cards.push({ type: "fare", advice, variant: flags.book_nudge_copy, route: `${fl.from}→${fl.to}` });
-    lines.push(t.nudge(l, flags.book_nudge_copy, advice));
-    trace("engine", conv.id, { step: "fare advice", source: advice.source, verdict: advice.verdict, currentFare: advice.currentFare, expected: advice.expectedFare, volatilityPct: advice.volatilityPct, abVariant: flags.book_nudge_copy });
+    // Live fares: the pointer comes from the real price history, explained in the user's language (Sarvam,
+    // numbers checked). Simulated fares keep the old model and its wording.
+    const routeName = `${cityByCode.get(fl.from)?.name ?? fl.from} → ${cityByCode.get(fl.to)?.name ?? fl.to}`;
+    const exp = advice.method === "history" ? await explainFare(advice, routeName, fl.date, l, flags.book_nudge_copy, conv.id, flags.fare_explainer_enabled) : undefined;
+    cards.push({ type: "fare", advice, variant: flags.book_nudge_copy, route: `${fl.from}→${fl.to}`, explanation: exp?.text, explainedBy: exp?.via });
+    lines.push(exp ? `${advice.verdict === "monitor" ? "👀" : "⏰"} ${exp.text}` : t.nudge(l, flags.book_nudge_copy, advice));
+    trace("engine", conv.id, {
+      step: "fare advice", source: advice.source, method: advice.method, verdict: advice.verdict, reason: advice.reason, currentFare: advice.currentFare,
+      evidence: advice.evidence && { days: advice.evidence.days, cheaperThanPct: advice.evidence.cheaperThanPct, trendPct: advice.evidence.trendPct, drop7: advice.evidence.drop.find((d) => d.days === 7) },
+      backtest: advice.backtest, explainedBy: exp?.via, abVariant: flags.book_nudge_copy,
+    });
   }
 
   const poolIt = its.find((i) => i.pool);
   if (poolIt?.pool && flags.pooling_enabled) {
     const p = poolIt.pool;
-    ensureSeedRiders(p.hub, p.arriveAt);
+    ensureSeedRiders(p.hub, p.arriveAt, p.town, p.km);
     const w = { ...flags.split_weights, windowMin: knobs.poolWindowMin };
     const meRider = { id: "__me", name: conv.name ?? "You", hub: p.hub, town: p.town, arriveAt: p.arriveAt, dropKm: p.km };
     const n = previewCount(meRider, w);
@@ -181,6 +240,7 @@ async function nextStep(conv: ConvRow, trip: Trip, flags: Awaited<ReturnType<typ
     cards.push({ type: "pool-preview", itineraryId: poolIt.id, hub: p.hub, town: p.town, waiting: n, soloFare: p.soloFare, estShare: est, arriveAt: p.arriveAt });
     lines.push(t.poolPreview(l, n, p.town));
   }
+  lines.push(...notes);
   if (flags.degrade_gracefully) lines.push(t.degraded(l));
   convs.update(conv.id, { plan: JSON.stringify(its) });
   return reply(lines.join("\n"), { stage: "PLAN_READY", cards, quickReplies: poolIt && flags.pooling_enabled ? ["pool", "reset"] : ["reset"] });
@@ -208,18 +268,25 @@ export async function turn(conv: ConvRow, input: Input, displayText?: string) {
   return out;
 }
 
-/** Trip submitted from the web form: keep only known fields/values. */
-function sanitizeTrip(x: Trip): Trip {
-  const code = (c?: string) => (c && cityByCode.has(c) ? c : undefined);
+/** Trip submitted from the web form: keep only known fields/values. From / To may be a code or a typed place name. */
+async function sanitizeTrip(x: Trip, convId: string): Promise<{ trip: Trip; missing: Missing[] }> {
+  const missing: Missing[] = [];
+  const place = async (v?: string) => {
+    if (!v?.trim()) return undefined;
+    const r = await resolvePlace(v, convId);
+    if (r.ok) return r.city.code;
+    missing.push(r);
+    return undefined;
+  };
   const out: Trip = {
-    origin: code(x.origin),
-    destination: code(x.destination),
+    origin: await place(x.origin),
+    destination: await place(x.destination),
     date: /^\d{4}-\d{2}-\d{2}$/.test(x.date ?? "") ? x.date : undefined,
     flexDays: Math.max(0, Math.min(3, Number(x.flexDays ?? 1) || 0)),
     modes: (x.modes ?? []).filter((m) => ["flight", "train", "cab"].includes(m)) as Mode[],
     travellers: Math.max(1, Math.min(6, Number(x.travellers ?? 1) || 1)),
   };
-  return out;
+  return { trip: out, missing };
 }
 
 /** "WATCH": alert this conversation when the flight fare in its latest plan drops (web + WhatsApp). */

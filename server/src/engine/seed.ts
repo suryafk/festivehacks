@@ -9,8 +9,13 @@ export interface City {
   kind: "metro" | "hub" | "town";
   hub?: string; // for towns: nearest airport hub
   kmFromHub?: number; // road distance from the hub airport
+  altHub?: string; // second-choice airport (bigger / better connected), tried when the first has no flights
   lat: number;
   lng: number;
+  state?: string;
+  /** Where this place came from: hand-made seed, the OurAirports list, or an OpenStreetMap lookup. */
+  source?: "seed" | "airport" | "geocoded";
+  airportSize?: "large" | "medium" | "small";
 }
 
 export interface TrainLeg {
@@ -59,7 +64,20 @@ export const cities: City[] = [
   { code: "MZP", name: "Mirzapur", aliases: ["mirzapur", "मिर्ज़ापुर", "मिर्जापुर"], kind: "town", hub: "VNS", kmFromHub: 75, lat: 25.15, lng: 82.57 },
 ];
 
-export const cityByCode = new Map(cities.map((c) => [c.code, c]));
+for (const c of cities) c.source = "seed";
+
+/**
+ * Every place the app knows, by code: the seed above, plus airports (IATA codes) and places looked up at
+ * runtime (codes like "x-shimla"), which `places.ts` adds with `registerPlace`. Watcher pods get the places
+ * they need with each job, so they never need the database.
+ */
+export const cityByCode = new Map<string, City>(cities.map((c) => [c.code, c]));
+export function registerPlace(c: City) {
+  const prev = cityByCode.get(c.code);
+  if (prev?.source === "seed") return prev; // hand-made data wins (it has trains, Hindi names, seed riders)
+  cityByCode.set(c.code, c);
+  return c;
+}
 
 const origins = ["BLR", "DEL", "BOM", "HYD"];
 const hubBase: Record<string, { dur: Record<string, number>; fare: Record<string, number> }> = {
@@ -147,19 +165,16 @@ export const festivals = [
 
 export function findCity(text: string): City | undefined {
   const t = text.toLowerCase().trim();
-  return cities.find((c) => c.code.toLowerCase() === t || c.aliases.some((a) => a === t)) ??
-    cities.find((c) => c.aliases.some((a) => t.includes(a)));
+  if (!t) return undefined;
+  const exact = (c: City) => c.code.toLowerCase() === t || c.name.toLowerCase() === t || c.aliases.some((a) => a === t);
+  // seed first (hand-made aliases), then airports and looked-up places; substring matching only for the seed
+  return cities.find(exact) ?? [...cityByCode.values()].find(exact) ?? cities.find((c) => c.aliases.some((a) => a.length > 3 && t.includes(a)));
 }
 
-// Well-known places Marg Bandhu does NOT cover yet. Detected without the LLM so the reply is always
-// "not covered yet" instead of a wrong substitution. Name first, then aliases (lower-case / Devanagari).
+// Places outside India. Marg Bandhu plans trips within India only; these are detected without the LLM so the
+// reply is always "not covered" instead of a wrong substitution. Name first, then aliases (lower-case / Devanagari).
 export const notCoveredPlaces: [string, ...string[]][] = [
-  ["Ahmedabad", "ahmedabad", "amdavad", "अहमदाबाद"], ["Nepal", "nepal", "नेपाल"], ["Kathmandu", "kathmandu", "काठमांडू"],
-  ["Goa", "goa", "गोवा"], ["Chennai", "chennai", "madras", "चेन्नई"], ["Kolkata", "kolkata", "calcutta", "कोलकाता"],
-  ["Pune", "pune", "पुणे"], ["Jaipur", "jaipur", "जयपुर"], ["Kochi", "kochi", "cochin", "कोच्चि"], ["Chandigarh", "chandigarh", "चंडीगढ़"],
-  ["Bhopal", "bhopal", "भोपाल"], ["Indore", "indore", "इंदौर"], ["Surat", "surat", "सूरत"], ["Nagpur", "nagpur", "नागपुर"],
-  ["Kanpur", "kanpur", "कानपुर"], ["Agra", "agra", "आगरा"], ["Prayagraj", "prayagraj", "allahabad", "प्रयागराज", "इलाहाबाद"],
-  ["Ranchi", "ranchi", "रांची"], ["Darbhanga", "darbhanga", "दरभंगा"], ["Dehradun", "dehradun", "देहरादून"],
-  ["Guwahati", "guwahati", "गुवाहाटी"], ["Bhubaneswar", "bhubaneswar", "भुवनेश्वर"], ["Srinagar", "srinagar", "श्रीनगर"],
-  ["Mysuru", "mysuru", "mysore", "मैसूर"], ["Coimbatore", "coimbatore", "कोयंबटूर"], ["Dubai", "dubai", "दुबई"],
+  ["Nepal", "nepal", "नेपाल"], ["Kathmandu", "kathmandu", "काठमांडू"], ["Dubai", "dubai", "दुबई"],
+  ["Bangladesh", "bangladesh", "बांग्लादेश"], ["Dhaka", "dhaka", "ढाका"], ["Sri Lanka", "sri lanka", "श्रीलंका"],
+  ["Singapore", "singapore", "सिंगापुर"], ["London", "london", "लंदन"], ["USA", "usa", "america", "अमेरिका"],
 ];

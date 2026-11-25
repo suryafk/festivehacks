@@ -3,7 +3,7 @@
 // what falls over on a Diwali-eve surge, and what NudgeBee + the `degrade_gracefully` flag fix.
 import { config } from "./config.ts";
 import { matchGroup, type Rider, type SplitWeights } from "./engine/pooling.ts";
-import { cityByCode } from "./engine/seed.ts";
+import { cityByCode, registerPlace, type City } from "./engine/seed.ts";
 
 const H = { "Content-Type": "application/json", "x-internal-token": config.internalToken };
 const api = async (path: string, body?: unknown) => {
@@ -56,7 +56,8 @@ export async function runWatcher() {
       const cfg = (await api("/internal/config")) as { watcher: { batchSize: number; intervalMs: number }; degrade: boolean; split: SplitWeights };
       batchSize = cfg.degrade ? Math.max(5, Math.round(cfg.watcher.batchSize / 10)) : cfg.watcher.batchSize;
       interval = cfg.degrade ? cfg.watcher.intervalMs * 2 : cfg.watcher.intervalMs;
-      const { jobs } = (await api("/internal/claim", { pod: config.podName, n: batchSize })) as { jobs: { request: Rider; candidates: Rider[] }[] };
+      const { jobs, places = [] } = (await api("/internal/claim", { pod: config.podName, n: batchSize })) as { jobs: { request: Rider; candidates: Rider[] }[]; places?: City[] };
+      for (const p of places) registerPlace(p); // airports / looked-up towns this batch mentions
 
       // Build the corridor index for the whole batch first (this is the memory-hungry part).
       const index = jobs.map((job) => ({ job, me: corridor(job.request), cands: job.candidates.map((c) => ({ c, pts: corridor(c) })) }));

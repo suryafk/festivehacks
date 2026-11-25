@@ -23,6 +23,8 @@ const W = {
     bestNow: "Best price now", liveSrc: "Google Flights, live", simSrc: "simulated",
     typical: "Typical", googleSays: (lv: string) => `Google says "${lv}"`, expected: "Usually costs",
     drop: "Chance it drops 5%+", inDays: (d: number) => `in ${d} days`,
+    seen: (pct: number, days: number, low: string, on: string) => `${pct >= 50 ? `Cheaper than ${pct}%` : `Dearer than ${100 - pct}%`} of the last ${days} days · lowest ${low} (${on})`,
+    pastDrops: "Past drops of 5%+ within a week",
     pointer: "👉 *Our pointer:*", verdict: { book_now: "Book now", wait: "Wait a little", monitor: "Let us watch it" },
     watchCta: "Reply *WATCH* and I'll message you the moment it drops.",
     cabTitle: (hub: string) => `🚕 *Cab mates from ${hub} airport*`,
@@ -45,6 +47,8 @@ const W = {
     bestNow: "अभी सबसे कम किराया", liveSrc: "Google Flights, लाइव", simSrc: "सिम्युलेटेड",
     typical: "आमतौर पर", googleSays: (lv: string) => `Google: "${lv}"`, expected: "आमतौर पर किराया",
     drop: "5%+ गिरने की संभावना", inDays: (d: number) => `${d} दिन में`,
+    seen: (pct: number, days: number, low: string, on: string) => `पिछले ${days} दिनों के ${pct >= 50 ? `${pct}% दिनों से सस्ता` : `${100 - pct}% दिनों से महँगा`} · सबसे कम ${low} (${on})`,
+    pastDrops: "पहले एक हफ़्ते में 5%+ गिरावट",
     pointer: "👉 *हमारी सलाह:*", verdict: { book_now: "अभी बुक करें", wait: "थोड़ा रुकिए", monitor: "हम नज़र रखेंगे" },
     watchCta: "*WATCH* लिखें, किराया गिरते ही मैं आपको बताऊँगा।",
     cabTitle: (hub: string) => `🚕 *${hub} एयरपोर्ट से कैब साथी*`,
@@ -58,7 +62,10 @@ const W = {
   },
 };
 
-const LABEL_HI: Record<string, string> = { "Direct flight": "सीधी फ्लाइट", "Flight + train": "फ्लाइट + ट्रेन", "Flight + cab": "फ्लाइट + कैब", "Direct train": "सीधी ट्रेन", "Train + train": "ट्रेन + ट्रेन" };
+const LABEL_HI: Record<string, string> = {
+  "Direct flight": "सीधी फ्लाइट", "Flight + train": "फ्लाइट + ट्रेन", "Flight + cab": "फ्लाइट + कैब", "Direct train": "सीधी ट्रेन", "Train + train": "ट्रेन + ट्रेन",
+  "Cab + flight": "कैब + फ्लाइट", "Cab + flight + train": "कैब + फ्लाइट + ट्रेन", "Cab + flight + cab": "कैब + फ्लाइट + कैब", "Cab all the way": "पूरा रास्ता कैब से",
+};
 const LEVEL_HI: Record<string, string> = { low: "कम", typical: "सामान्य", high: "ज़्यादा" };
 const label = (s: string, l: L) => (l === "hi" ? LABEL_HI[s] ?? s : s);
 const ICON: Record<string, string> = { flight: "✈️", train: "🚆", cab: "🚕", transfer: "🚶" };
@@ -96,7 +103,7 @@ export function formatPlanForWhatsApp(cards: Card[], lang: string, convId: strin
   const w = W[l];
   const plan = cards.find((c) => c.type === "plan") as (Card & { trip: any; itineraries: Itinerary[]; bufferMin: number; festiveRush: boolean }) | undefined;
   if (!plan?.itineraries?.length) return null;
-  const fare = cards.find((c) => c.type === "fare") as (Card & { advice: FareAdvice; route: string }) | undefined;
+  const fare = cards.find((c) => c.type === "fare") as (Card & { advice: FareAdvice; route: string; explanation?: string }) | undefined;
   const pool = cards.find((c) => c.type === "pool-preview") as (Card & { hub: string; town: string; waiting: number; soloFare: number; estShare?: number; arriveAt: number }) | undefined;
   const { trip } = plan;
   const [best, ...rest] = plan.itineraries;
@@ -129,8 +136,9 @@ export function formatPlanForWhatsApp(cards: Card[], lang: string, convId: strin
       w.fareTitle(route),
       `${w.bestNow}: *${rupee(a.currentFare)}* _(${a.source === "google_flights" ? w.liveSrc : w.simSrc})_`,
       a.typicalRange ? `${w.typical}: ${rupee(a.typicalRange[0])}–${rupee(a.typicalRange[1])}${a.priceLevel ? ` · ${w.googleSays(l === "hi" ? LEVEL_HI[a.priceLevel] ?? a.priceLevel : a.priceLevel)}` : ""}` : `${w.expected}: ${rupee(a.expectedFare)}`,
-      a.dropProb?.length ? `${w.drop}: ${a.dropProb.map((d) => `${d.pct}% ${w.inDays(d.days)}`).join(" · ")}` : "",
-      `${w.pointer} ${w.verdict[a.verdict] ?? a.verdict}`,
+      a.evidence ? w.seen(a.evidence.cheaperThanPct, a.evidence.days, rupee(a.evidence.min.fare), dayLabel(a.evidence.min.date, l)) : "",
+      a.dropProb?.length ? `${a.method === "history" ? w.pastDrops : w.drop}: ${a.dropProb.map((d) => `${d.pct}% ${w.inDays(d.days)}`).join(" · ")}` : "",
+      `${w.pointer} ${w.verdict[a.verdict] ?? a.verdict}${fare.explanation ? ` — ${fare.explanation}` : ""}`,
       a.verdict !== "book_now" ? w.watchCta : "",
     ].filter(Boolean).join("\n");
   }

@@ -1,7 +1,8 @@
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-process.env.DATA_DIR = new URL("./.tmp-flights/", import.meta.url).pathname;
+process.env.DATA_DIR = fileURLToPath(new URL("./.tmp-flights/", import.meta.url));
 const { parseSerpApi } = await import("../src/integrations/googleFlights.ts");
 const { adviseFare, defaultFareModel } = await import("../src/engine/fares.ts");
 const fixture = JSON.parse(readFileSync(new URL("./fixtures-google-flights.json", import.meta.url), "utf8"));

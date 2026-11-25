@@ -1,4 +1,4 @@
-import { AIRPORT_TO_STATION_MIN, cab, cityByCode, flights, trains, type Mode } from "./seed.ts";
+import { AIRPORT_TO_STATION_MIN, cab, cityByCode, flights, trains, type City, type FlightRoute, type Mode } from "./seed.ts";
 import { defaultFareModel, fareOn, type FareModel } from "./fares.ts";
 import type { LiveFlight } from "../integrations/googleFlights.ts";
 
@@ -42,6 +42,49 @@ export interface PlanSettings {
   today: Date;
   /** Real schedules + prices from Google Flights, keyed "FROM-TO-YYYY-MM-DD". Missing keys use the simulated timetable. */
   live?: Map<string, LiveFlight[]>;
+  /** Airports to fly between (chosen by the engine, e.g. the backup airport when the nearest has no flights). */
+  airports?: { origin?: string; dest?: string };
+  /** "FROM-TO" airport pairs that Google Flights says have no flights: don't invent simulated ones. */
+  noFlights?: Set<string>;
+}
+
+const MAX_CAB_KM = 700; // "cab all the way" only for trips a person would actually drive in a day
+const ROAD_FACTOR = 1.25;
+const kmBetween = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+  const r = (d: number) => (d * Math.PI) / 180;
+  const x = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lng - a.lng) / 2) ** 2;
+  return Math.max(5, Math.round(2 * 6371 * Math.asin(Math.sqrt(x)) * ROAD_FACTOR));
+};
+const hasAirport = (c: City) => Boolean(c.airportSize || (c.source === "seed" && c.kind !== "town"));
+/** The airport this place flies through: itself, or its nearest suitable airport. */
+export const airportFor = (c: City) => (hasAirport(c) ? c.code : c.hub);
+
+function hash(s: string) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+const DEPS = ["05:40", "07:15", "09:30", "12:05", "14:50", "17:35", "20:10"];
+
+/** Seed timetable if we have one, else a plausible one from the distance (clearly marked simulated). */
+export function routeFor(from: string, to: string): FlightRoute | undefined {
+  const seeded = flights.find((f) => f.from === from && f.to === to);
+  if (seeded) return seeded;
+  const a = cityByCode.get(from), b = cityByCode.get(to);
+  if (!a || !b || from === to) return undefined;
+  const km = kmBetween(a, b) / ROAD_FACTOR; // air distance
+  if (km < 150) return undefined; // nobody flies that
+  const h = hash(`${from}${to}`);
+  const small = a.airportSize === "small" || b.airportSize === "small";
+  const n = small ? 1 + (h % 2) : 3 + (h % 3);
+  return {
+    from, to,
+    // n departure slots, picked deterministically per route
+    deps: DEPS.map((d, i) => ({ d, k: hash(`${from}${to}${i}`) })).sort((x, y) => x.k - y.k).slice(0, n).map((x) => x.d).sort(),
+    durMin: Math.round((35 + (km / 760) * 60) / 5) * 5,
+    baseFare: Math.round((2300 + km * 3.3) / 50) * 50,
+    airline: ["IndiGo", "Air India Express", "Akasa Air"],
+  };
 }
 
 const IST = "+05:30";
@@ -54,7 +97,8 @@ export const cabFare = (km: number) => Math.round((cab.baseFare + km * cab.perKm
 const cabMin = (km: number) => Math.round((km / cab.kmh) * 60);
 
 function flightsOn(from: string, to: string, date: string, s: PlanSettings) {
-  const r = flights.find((f) => f.from === from && f.to === to);
+  if (s.noFlights?.has(`${from}-${to}`)) return [];
+  const r = routeFor(from, to);
   const live = s.live?.get(`${from}-${to}-${date}`);
   if (live?.length) {
     // nonstop first, then the cheapest few, so the planner sees realistic choices without 30 near-duplicates
@@ -121,60 +165,75 @@ function itin(label: string, legs: Leg[], date: string, tags: string[], extra: P
     totalMin: Math.round((arrive - depart) / MIN),
     totalFare: legs.reduce((a, l) => a + l.fare, 0),
     date,
-    tags,
+    tags: [...tags], // own copy: "recommended" etc. are added per itinerary later
     ...extra,
   };
 }
 
 export function plan(trip: Required<Pick<Trip, "origin" | "destination" | "date">> & Trip, s: PlanSettings): Itinerary[] {
   const modes = new Set<Mode>(trip.modes?.length ? trip.modes : ["flight", "train", "cab"]);
+  const orig = cityByCode.get(trip.origin);
   const dest = cityByCode.get(trip.destination);
-  if (!dest) return [];
+  if (!orig || !dest || orig.code === dest.code) return [];
   const flex = Math.min(trip.flexDays ?? 1, 3);
   const results: Itinerary[] = [];
+
+  const oA = s.airports?.origin ?? airportFor(orig);
+  const dA = s.airports?.dest ?? airportFor(dest);
+  const oAirport = oA ? cityByCode.get(oA) : undefined;
+  const dAirport = dA ? cityByCode.get(dA) : undefined;
+  const firstKm = oAirport && oA !== orig.code ? kmBetween(orig, oAirport) : 0;
+  const lastKm = dAirport && dA !== dest.code ? (dest.hub === dA && dest.kmFromHub ? dest.kmFromHub : kmBetween(dAirport, dest)) : 0;
+  const totalRoadKm = kmBetween(orig, dest);
 
   for (let off = -flex; off <= flex; off++) {
     const date = addDays(trip.date, off);
     if (new Date(date + "T23:59:59" + IST).getTime() < s.today.getTime()) continue;
     const dateTag = off === 0 ? [] : [off < 0 ? `${-off}d early` : `${off}d later`];
 
-    // 1) direct flight to a hub / metro
-    if (modes.has("flight") && dest.kind !== "town") {
-      for (const f of flightsOn(trip.origin, dest.code, date, s))
-        results.push(itin("Direct flight", [{ mode: "flight", from: trip.origin, to: dest.code, ...f }], date, dateTag, {
-          flight: { from: trip.origin, to: dest.code, baseFare: f.baseFare, date },
-        }));
-    }
-
-    if (dest.kind === "town" && dest.hub) {
-      const hub = dest.hub;
-      const fl = modes.has("flight") ? flightsOn(trip.origin, hub, date, s) : [];
-      for (const f of fl) {
-        const flightLeg: Leg = { mode: "flight", from: trip.origin, to: hub, ...f };
-        const flightInfo = { from: trip.origin, to: hub, baseFare: f.baseFare, date };
-        // 2) flight + train
+    if (modes.has("flight") && oA && dA && oA !== dA) {
+      for (const f of flightsOn(oA, dA, date, s)) {
+        const flightLeg: Leg = { mode: "flight", from: oA, to: dA, ...f };
+        const flightInfo = { from: oA, to: dA, baseFare: f.baseFare, date };
+        // 0) no airport at home: a cab to the airport first, arriving 90 min before departure
+        const pre: Leg[] = [];
+        if (firstKm) {
+          const arrive = f.depart - 90 * MIN;
+          pre.push({ mode: "cab", from: orig.code, to: oA, depart: arrive - cabMin(firstKm) * MIN, arrive, name: `Cab to ${oAirport!.name} airport (${firstKm} km)`, fare: cabFare(firstKm) });
+        }
+        // 1) the destination has its own airport
+        if (dA === dest.code) {
+          results.push(itin(pre.length ? "Cab + flight" : "Direct flight", [...pre, flightLeg], date, dateTag, { flight: flightInfo }));
+          continue;
+        }
+        // 2) flight + train (only where we have train data)
         if (modes.has("train")) {
-          const toStation = AIRPORT_TO_STATION_MIN[hub] ?? 40;
-          const tr = trainsAfter(hub, dest.code, f.arrive + (toStation + s.bufferMin) * MIN)[0];
+          const toStation = AIRPORT_TO_STATION_MIN[dA] ?? 40;
+          const tr = trainsAfter(dA, dest.code, f.arrive + (toStation + s.bufferMin) * MIN)[0];
           if (tr && tr.depart - f.arrive < 10 * 60 * MIN) {
-            const transfer: Leg = { mode: "transfer", from: hub, to: hub, depart: f.arrive, arrive: f.arrive + toStation * MIN, name: "Airport → railway station (metro/auto)", fare: 150 };
-            results.push(itin("Flight + train", [flightLeg, transfer, tr], date, [...dateTag, `${Math.round((tr.depart - f.arrive) / MIN)} min connection`], { flight: flightInfo }));
+            const transfer: Leg = { mode: "transfer", from: dA, to: dA, depart: f.arrive, arrive: f.arrive + toStation * MIN, name: "Airport → railway station (metro/auto)", fare: 150 };
+            results.push(itin(pre.length ? "Cab + flight + train" : "Flight + train", [...pre, flightLeg, transfer, tr], date, [...dateTag, `${Math.round((tr.depart - f.arrive) / MIN)} min connection`], { flight: flightInfo }));
           }
         }
-        // 3) flight + (shared) cab
-        if (modes.has("cab") && dest.kmFromHub) {
-          const km = dest.kmFromHub;
+        // 3) flight + (shared) cab for the last mile
+        if (modes.has("cab") && lastKm) {
           const depart = f.arrive + 25 * MIN; // bags + cab pickup
-          const cabLeg: Leg = { mode: "cab", from: hub, to: dest.code, depart, arrive: depart + cabMin(km) * MIN, name: `Outstation cab (${km} km)`, fare: cabFare(km), note: "solo fare; pooling can cut this" };
-          results.push(itin("Flight + cab", [flightLeg, cabLeg], date, [...dateTag, "poolable"], {
+          const cabLeg: Leg = { mode: "cab", from: dA, to: dest.code, depart, arrive: depart + cabMin(lastKm) * MIN, name: `Outstation cab (${lastKm} km)`, fare: cabFare(lastKm), note: "solo fare; pooling can cut this" };
+          results.push(itin(pre.length ? "Cab + flight + cab" : "Flight + cab", [...pre, flightLeg, cabLeg], date, [...dateTag, "poolable"], {
             flight: flightInfo,
-            pool: { hub, town: dest.code, km, arriveAt: f.arrive, soloFare: cabFare(km) },
+            pool: { hub: dA, town: dest.code, km: lastKm, arriveAt: f.arrive, soloFare: cabFare(lastKm) },
           }));
         }
       }
     }
 
-    // 4) train only (direct, or via hub)
+    // 4) cab all the way (short trips: Delhi → Shimla, Lucknow → Gonda)
+    if (modes.has("cab") && totalRoadKm <= MAX_CAB_KM && off === 0) { // same price any day: show it once
+      const depart = at(date, totalRoadKm > 350 ? "05:30" : "08:00");
+      results.push(itin("Cab all the way", [{ mode: "cab", from: orig.code, to: dest.code, depart, arrive: depart + cabMin(totalRoadKm) * MIN, name: `Outstation cab (${totalRoadKm} km)`, fare: cabFare(totalRoadKm), note: "door to door, estimated fare" }], date, [...dateTag, "door to door"]));
+    }
+
+    // 5) train only (direct, or via the hub): seed timetables only
     if (modes.has("train")) {
       const dayStart = at(date, "00:00");
       for (const t of trainsAfter(trip.origin, dest.code, dayStart).filter((t) => t.depart < dayStart + 86_400_000))

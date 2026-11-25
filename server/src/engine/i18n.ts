@@ -31,6 +31,25 @@ export const t = {
     l === "hi"
       ? `माफ़ कीजिए, ${places.map((p) => notCoveredPlaces.find(([n]) => n === p)?.find((a) => /[\u0900-\u097F]/.test(a)) ?? p).join(" और ")} अभी मार्ग बंधु पर उपलब्ध नहीं है। अभी हम बेंगलुरु, दिल्ली, मुंबई और हैदराबाद से उत्तर प्रदेश और बिहार के शहरों (जैसे लखनऊ, गोरखपुर, गोंडा, अयोध्या, पटना, आरा, वाराणसी, जौनपुर) तक की यात्रा प्लान करते हैं। कहीं और जाना हो तो बताइए!`
       : `Sorry, ${places.join(" and ")} ${places.length > 1 ? "aren't" : "isn't"} on Marg Bandhu yet. Right now we plan trips from Bengaluru, Delhi, Mumbai and Hyderabad to towns in Uttar Pradesh and Bihar (e.g. Lucknow, Gorakhpur, Gonda, Ayodhya, Patna, Ara, Varanasi, Jaunpur). Want to try one of those?`,
+  /** A place we couldn't find (or that's outside India). Replaces the old "not covered yet" for Indian places. */
+  placeProblem: (l: L, abroad: string[], notFound: string[], failed: string[] = []) => {
+    const hiName = (p: string) => notCoveredPlaces.find(([n]) => n === p)?.find((a) => /[\u0900-\u097F]/.test(a)) ?? p;
+    const parts: string[] = [];
+    if (abroad.length)
+      parts.push(l === "hi" ? `अभी हम सिर्फ़ भारत के अंदर की यात्राएँ प्लान करते हैं (${abroad.map(hiName).join(", ")} भारत से बाहर है)।` : `Right now we plan trips within India only (${abroad.join(", ")} ${abroad.length > 1 ? "are" : "is"} outside India).`);
+    if (notFound.length)
+      parts.push(l === "hi" ? `माफ़ कीजिए, “${notFound.join("”, “")}” मुझे नक्शे पर नहीं मिला। पास के शहर या कस्बे का नाम बताइए?` : `Sorry, I couldn't find “${notFound.join("”, “")}” on the map. Could you give the nearest town or city?`);
+    if (failed.length)
+      parts.push(l === "hi" ? `“${failed.join("”, “")}” को नक्शे पर ढूँढने में दिक्कत आई (नेटवर्क)। कृपया फिर से कोशिश करें।` : `I couldn't look up “${failed.join("”, “")}” just now (network problem). Please try again.`);
+    return parts.join(" ");
+  },
+  samePlace: (l: L) => (l === "hi" ? "शुरुआत और मंज़िल एक ही जगह है। कहाँ से कहाँ जाना है?" : "That's the same place twice. Where from, and where to?"),
+  noTrainData: (l: L) =>
+    l === "hi"
+      ? "🚆 इस रास्ते की ट्रेन समय-सारणी अभी हमारे पास नहीं है (अभी सिर्फ़ उत्तर प्रदेश और बिहार के कुछ रास्ते)। IRCTC पर ट्रेन देख लीजिए।"
+      : "🚆 We don't have train timetables for this route yet (only some Uttar Pradesh and Bihar routes for now). Check IRCTC for trains.",
+  noFlightsFound: (l: L) =>
+    l === "hi" ? "✈️ Google Flights पर इस तारीख को पास के हवाई अड्डों के बीच कोई फ्लाइट नहीं मिली।" : "✈️ Google Flights shows no flights between the nearby airports on this date.",
   coverage: (l: L) =>
     l === "hi"
       ? "अभी हम बेंगलुरु, दिल्ली, मुंबई या हैदराबाद से उत्तर प्रदेश और बिहार के शहरों तक की यात्रा प्लान करते हैं। कहाँ से कहाँ जाना है?"

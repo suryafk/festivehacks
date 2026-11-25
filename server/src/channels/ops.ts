@@ -26,7 +26,7 @@ export function opsRoutes(app: FastifyInstance) {
   app.post("/internal/claim", async (req, reply) => {
     if (!internalOk(req)) return reply.code(401).send();
     const { pod, n } = req.body as { pod: string; n: number };
-    return { jobs: claim(pod, Math.min(500, n), 20_000) };
+    return claim(pod, Math.min(500, n), 20_000);
   });
   app.post("/internal/result", async (req, reply) => {
     if (!internalOk(req)) return reply.code(401).send();

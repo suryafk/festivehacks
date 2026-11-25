@@ -12,6 +12,51 @@ Running log of every change, newest first. Each entry says what changed, how it 
 
 ---
 
+## Unreleased · 2026-11-25 · fare pointer from real price history · not deployed
+- **Why:** the old pointer used a hardcoded curve (festival surcharge × lead-time × noise). Its "chance of a drop" was a Monte Carlo run over that curve, and its forecast line was invented. Nothing in it had been tested.
+- **New `server/src/engine/fareStats.ts`** (pure, unit-tested), used whenever Google returns ≥7 days of price history:
+  - evidence: share of past days dearer than today, min / median, weekly trend;
+  - a **historical drop chance**: on past days priced like today, how often the fare fell ≥5% within 3 / 7 days;
+  - plain ordered rules → book now / watch it, each with one reason;
+  - a walk-forward **backtest**.
+  - Removed: the invented forecast curve and the "wait until X to save ₹Y" verdict for live fares.
+- **Self-check:** "watch it" is withdrawn when it wouldn't have paid off on that route's own history.
+- **Own price history:** new table `fare_obs`. Every live search stores Google's history plus today's price; reads merge it, so history grows past Google's ~60 days. Cache reads backfill it.
+- **Explanation (new `fareExplain.ts`):**
+  - Sarvam joins ready-made en/hi phrases into ≤2 sentences, using `sarvam-105b-conversations`. `sarvam-105b` thinks for ~2,400 tokens (~12 s, empty reply at 900 tokens).
+  - Rejected if it contains a number not in the phrases, a forecast word ("may rise", "बढ़ सकता"), or the wrong script; the written template is used instead.
+  - The plan waits ≤4.5 s; otherwise the template is used and Sarvam's text is cached for next time.
+  - Bare numbers led the model to mangle meanings ("65% cheaper than average"), hence the phrases.
+  - Flag `fare_explainer_enabled`; the A/B `book_nudge_copy` variant sets the tone.
+- **Flagsmith fix (`flags.ts`):** the SDK returns `false` for a flag that doesn't exist; missing flags now use the app's default.
+- **UI:**
+  - Web card: "today vs the last N days" tile, history chart with Google's typical range and the lowest point (no future line), the explained pointer, and the backtest in the footnote.
+  - WhatsApp fare block: evidence line ("Cheaper / Dearer than X% of the last N days"), past drops, and the explanation.
+- **Backtest** (`node scripts/backtest-fares.mts`), on the 3 routes stored today (90 route-days):
+  - overall: rules right 54% vs always-book 56%;
+  - BLR→LKO 58% vs 39% (8 of 10 "watch" calls right);
+  - DEL→IXC 50% vs 71% (flat fare, all 7 "watch" calls wrong);
+  - PNQ→DED tie.
+  - The walk-forward self-check doesn't change these (the wrong calls cluster early). Not tuned on 3 routes on purpose.
+- **Verified locally:**
+  - `npm test` 20/20 (8 new: evidence, spikes, drop chance, rules, backtest, self-check, number check, templates in both languages, wording follows numbers); web `tsc` clean.
+  - Live keys on a separate instance (port 8081, copy of the DB, no extra SerpApi searches) for BLR→Gonda (en + hi), Delhi→Shimla, Pune→Rishikesh (en + hi). Explanations were accepted and correct. A repeat plan takes 0.6–3 s (cached).
+  - WhatsApp blocks rendered.
+
+## Unreleased · 2026-11-25 · any origin and destination in India · not deployed
+- **Places:** new `server/src/engine/places.ts`. Seed towns keep their hand-made data. **117 Indian airports** with scheduled flights come from OurAirports (public domain), built into `server/src/data/airports-in.json` by `scripts/build-airports.mjs`, with corrected city names (Mopa → Goa, Bhuntar → Kullu/Manali; Shimla added by hand). Any other place is looked up on **OpenStreetMap Nominatim**: India only, 1 request/s, real User-Agent, cached forever in SQLite (`places`, `geocode_cache`), Hindi name from `name:hi`. Every place gets a nearest suitable airport (bigger airports preferred) plus a **backup airport**.
+- **Planner:** fly between the two places' airports, with a cab to the airport if the origin has none. Last mile by seed train or cab. New **"Cab all the way"** option for trips under 700 km. Distance-based simulated timetables for routes outside the seed. Labels: Cab + flight, Cab + flight + cab, and so on. Fixed itineraries sharing one tags array.
+- **Live flights:** up to 2 SerpApi searches per plan. If Google says the nearest airports have no flights (e.g. Delhi–Shimla), try the backup pair (Delhi–Chandigarh + cab) and never invent flights there. "No results" is cached as an answer. One retry on a dropped connection.
+- **Intent:** Sarvam returns place names as said (any Indian place). Guard against substitution kept: a known place is dropped only if our own parser found a different place for that slot, or a place outside India. The fallback parser spots every airport city and reads "X to Y" / "X से Y" / "Y jana hai". Ambiguous words ("gaya" = went) are only places in a from/to slot. "Not covered" now means outside India (Nepal, Dubai…). Unknown places get "couldn't find X", and network failures get "try again".
+- **Pooling:** works at any airport. Simulated co-travellers for non-seed airports. Watcher pods get the place records with each claim (they have no DB).
+- **Web:** From/To are free-text inputs with suggestions (`GET /api/places?q=`, local list only). Plan cards carry `names` (code → name) and `notes` ("no train timetables for this route", "no flights between nearby airports").
+- **Limits:** trains only on seed routes; Gorakhpur (GKP seed town) still routes via Lucknow although it has its own airport (GOP).
+- Verified locally: `npm test` 11/11 (new tests: any-city parsing, gaya); web `tsc` clean. Offline: Delhi→Shimla, Pune→Rishikesh, Hyderabad→Madhubani, Madhubani→Bengaluru (form), Kathmandu ("outside India"), unknown place, pool matched at Darbhanga, cab-mates map. Live keys: Sarvam extracted all names (incl. Hindi शिमला); Delhi→Shimla used live DEL→IXC after Google had no DEL→SLV; Pune→Rishikesh live PNQ→DED; Bengaluru→Gonda unchanged. About 5 SerpApi searches used (243 left).
+
+## Unreleased · 2026-11-25 · fix paths with spaces · not deployed
+- `server/src/config.ts` and both tests used `new URL(...).pathname`, which URL-encodes spaces (`Ubuntu Backup` → `Ubuntu%20Backup`). With a space in the checkout path the server couldn't find `web/dist` (`/` returned 404) and the default `DATA_DIR`/test temp dirs were created under a stray `…%20…` folder. Switched to `fileURLToPath()`. No effect on the VM or Docker (no spaces, and `DATA_DIR`/`WEB_DIST` are set there).
+- Verified locally: `npm test` 10/10; offline run and live-key run with no path overrides: web app served, Hindi trip → PLAN_READY (live Google Flights ₹7,935), metro→metro and "Shimla" get "not covered", pool matched with fair split, fare watch, Bulbul voice reply (WAV served), ops/metrics OK.
+
 ## Docs · 2026-11-25 · README rewrite · no deploy needed
 - `README.md` rewritten for the submission: problem, features table, how each sponsor is used (Sarvam models, the Flagsmith flag table, the NudgeBee surge → OOMKilled → workflow story), architecture, run locally (offline mode + key table), deploy, 3-minute demo script, honest limitations, repo layout, live links incl. WhatsApp sandbox.
 - Verified from a **fresh clone** of GitHub: web build OK, `npm test` 10/10, `INLINE_WATCHER=1 npm run dev` serves the app (HTTP 200) and plans a Hindi trip offline (PLAN_READY, simulated fares). Checked against `.env.vm`: no secret values.
