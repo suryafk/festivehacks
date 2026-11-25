@@ -1,10 +1,12 @@
+import { fileURLToPath } from "node:url";
+
 const env = process.env;
 
 export const config = {
   port: Number(env.PORT ?? 8080),
   publicBaseUrl: (env.PUBLIC_BASE_URL ?? `http://localhost:${env.PORT ?? 8080}`).replace(/\/$/, ""),
-  dataDir: env.DATA_DIR ?? new URL("../data/", import.meta.url).pathname,
-  webDist: env.WEB_DIST ?? new URL("../../web/dist/", import.meta.url).pathname,
+  dataDir: env.DATA_DIR ?? fileURLToPath(new URL("../data/", import.meta.url)),
+  webDist: env.WEB_DIST ?? fileURLToPath(new URL("../../web/dist/", import.meta.url)),
   internalToken: env.INTERNAL_TOKEN ?? "dev-internal-token",
   opsToken: env.OPS_TOKEN ?? "dev-ops-token",
 

@@ -12,6 +12,10 @@ Running log of every change, newest first. Each entry says what changed, how it 
 
 ---
 
+## Unreleased · 2026-11-25 · fix paths with spaces · not deployed
+- `server/src/config.ts` and both tests used `new URL(...).pathname`, which URL-encodes spaces (`Ubuntu Backup` → `Ubuntu%20Backup`). With a space in the checkout path the server couldn't find `web/dist` (`/` returned 404) and the default `DATA_DIR`/test temp dirs were created under a stray `…%20…` folder. Switched to `fileURLToPath()`. No effect on the VM or Docker (no spaces, and `DATA_DIR`/`WEB_DIST` are set there).
+- Verified locally: `npm test` 10/10; offline run and live-key run with no path overrides: web app served, Hindi trip → PLAN_READY (live Google Flights ₹7,935), metro→metro and "Shimla" get "not covered", pool matched with fair split, fare watch, Bulbul voice reply (WAV served), ops/metrics OK.
+
 ## Docs · 2026-11-25 · README rewrite · no deploy needed
 - `README.md` rewritten for the submission: problem, features table, how each sponsor is used (Sarvam models, the Flagsmith flag table, the NudgeBee surge → OOMKilled → workflow story), architecture, run locally (offline mode + key table), deploy, 3-minute demo script, honest limitations, repo layout, live links incl. WhatsApp sandbox.
 - Verified from a **fresh clone** of GitHub: web build OK, `npm test` 10/10, `INLINE_WATCHER=1 npm run dev` serves the app (HTTP 200) and plans a Hindi trip offline (PLAN_READY, simulated fares). Checked against `.env.vm`: no secret values.

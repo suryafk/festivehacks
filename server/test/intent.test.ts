@@ -1,6 +1,7 @@
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-process.env.DATA_DIR = new URL("./.tmp-intent/", import.meta.url).pathname;
+process.env.DATA_DIR = fileURLToPath(new URL("./.tmp-intent/", import.meta.url));
 const { heuristicIntent } = await import("../src/engine/intent.ts");
 const today = new Date("2026-11-25T06:00:00Z");
 
