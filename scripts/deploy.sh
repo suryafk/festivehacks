@@ -16,10 +16,8 @@ docker build -t marg-bandhu:latest .
 echo "▶ Importing image into k3s containerd"
 docker save marg-bandhu:latest | sudo k3s ctr images import -
 
-if [ -n "$EMAIL" ]; then
-  echo "▶ Enabling Let's Encrypt on Traefik"
-  sed "s/EMAIL_PLACEHOLDER/$EMAIL/" k8s/traefik-letsencrypt.yaml | kubectl apply -f -
-fi
+echo "▶ Enabling Let's Encrypt on Traefik (email optional)"
+sed "s/EMAIL_PLACEHOLDER/$EMAIL/" k8s/traefik-letsencrypt.yaml | kubectl apply -f -
 
 kubectl apply -f <(sed "s/HOST_PLACEHOLDER/$HOST/g" k8s/app.yaml)
 
