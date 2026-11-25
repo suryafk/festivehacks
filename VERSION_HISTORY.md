@@ -12,6 +12,23 @@ Running log of every change, newest first. Each entry says what changed, how it 
 
 ---
 
+## Docs · 2026-11-25 · README rewritten for everyone · no deploy needed
+- `README.md` is written for non-technical readers first. Sections:
+  - vision;
+  - what it does, in plain words;
+  - a step-by-step guide for the website and WhatsApp (commands, languages, places);
+  - each sponsor in detail: the five Sarvam models and how the AI is kept honest; every Flagsmith flag and what it controls (A/B test, segments, remote settings, kill switches, `degrade_gracefully`); NudgeBee's detect → diagnose → approve → scale + Flagsmith → report loop and the Ops rehearsal;
+  - real vs simulated, plus the backtest result;
+  - Rohit's user journey (Mermaid journey + step by step);
+  - technical architecture (Mermaid flowchart, request flow, building blocks, fallbacks);
+  - developer setup and deploy at the end.
+- Corrected claims to match the code and current features:
+  - any place in India (was 4 metros → UP/Bihar);
+  - the fare pointer is history-based (no forecast);
+  - languages are understood in 22 + English (Saaras) and spoken in 11 (Bulbul);
+  - no festive branding.
+- Both Mermaid diagrams were checked by hand only: automatic rendering in a headless browser was blocked, because it needed Mermaid from a CDN. Check them on GitHub.
+
 ## Unreleased · 2026-11-25 · landing name, result order, more trains · not deployed
 - **Landing:** the name is shown in English only (Hindi "मार्ग बंधु" removed from the hero and footer). The feature cards say "Multilingual · 22 Indian languages", and the fare and cab-mates cards mention replies and alerts in your language.
 - **Plan results order:** Ways to get there → Find cab mates → Should you book (was cab mates → fare → ways). Route notes stay just above the options.
