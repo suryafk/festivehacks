@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, city, day, DESTINATIONS, ORIGINS, type Card, type Config, type FareWatch, type Mode, type Reply, type Trip } from "./api";
+import { api, city, day, registerNames, type Card, type Config, type FareWatch, type Mode, type PlaceSuggestion, type Reply, type Trip } from "./api";
 import { CabTeaser, FlightPriceCard, Itineraries } from "./Cards";
 
 const MODES: { m: Mode; icon: string; label: string; hint: string }[] = [
@@ -9,6 +9,30 @@ const MODES: { m: Mode; icon: string; label: string; hint: string }[] = [
 ];
 
 const isoToday = () => new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
+
+/** From / To: type any place in India. Suggestions come from the server's list (cities, airports, places looked up
+ * before); anything else is looked up on OpenStreetMap when you generate the plan. */
+function PlaceInput({ id, label, value, placeholder, className, onChange }: { id: string; label: string; value?: string; placeholder: string; className: string; onChange: (v: string) => void }) {
+  const [opts, setOpts] = useState<PlaceSuggestion[]>([]);
+  const timer = useRef<number | undefined>(undefined);
+  const text = city(value);
+  const onType = (v: string) => {
+    onChange(v);
+    clearTimeout(timer.current);
+    if (v.trim().length < 2) return setOpts([]);
+    timer.current = window.setTimeout(() => api.places(v).then(setOpts).catch(() => {}), 150);
+  };
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-semibold">{label}</span>
+      <input list={`${id}-list`} aria-label={label} autoComplete="off" className={className} value={text} placeholder={placeholder}
+        onChange={(e) => onType(e.target.value)} />
+      <datalist id={`${id}-list`}>
+        {opts.map((o) => <option key={o.code} value={o.name}>{o.detail}</option>)}
+      </datalist>
+    </label>
+  );
+}
 
 function useRecorder() {
   const [rec, setRec] = useState<MediaRecorder | null>(null);
@@ -47,8 +71,9 @@ export default function Plan({ convId, cfg, notify, demo }: { convId: string | n
     if (!convId) return;
     api.get(convId).then((c) => {
       setWaLinked(c.whatsapp);
-      if (c.trip?.destination) setTrip((t) => ({ ...t, ...c.trip }));
       const last = [...c.messages].reverse().find((m) => m.payload?.cards?.some((x) => x.type === "plan"));
+      for (const m of c.messages) registerNames(m.payload?.cards?.find((x) => x.type === "plan")?.names);
+      if (c.trip?.destination) setTrip((t) => ({ ...t, ...c.trip }));
       // Only restore plans saved by this version of the app; older ones lack the price-outlook fields.
       const fare = last?.payload?.cards?.find((x) => x.type === "fare");
       const current = !fare || Array.isArray(fare.advice?.dropProb);
@@ -79,8 +104,9 @@ export default function Plan({ convId, cfg, notify, demo }: { convId: string | n
     setError(null);
     try {
       const p = await api.parse(convId, text);
+      registerNames(p.names);
       if (p.unknownPlaces?.length) {
-        setError(p.message ?? `${p.unknownPlaces.join(" and ")} isn't covered yet.`);
+        setError(p.message ?? `Couldn't find ${p.unknownPlaces.join(" and ")}.`);
         return;
       }
       const patch: Trip = {};
@@ -106,11 +132,14 @@ export default function Plan({ convId, cfg, notify, demo }: { convId: string | n
       setError("Pick where from, where to, a date and at least one mode.");
       return;
     }
-    if (t.origin === t.destination) return setError("From and To can't be the same.");
+    if (t.origin.trim().toLowerCase() === t.destination.trim().toLowerCase()) return setError("From and To can't be the same.");
     setError(null);
     setBusy("Building your door-to-door plan…");
     try {
       const r = await api.plan(convId, t);
+      const planCard = r.cards.find((c) => c.type === "plan");
+      registerNames(planCard?.names);
+      if (planCard?.trip) setTrip((x) => ({ ...x, origin: planCard.trip.origin, destination: planCard.trip.destination })); // typed names → places
       setResult(r);
       setWatch(null);
       if (!r.cards.some((c) => c.type === "plan")) setError(r.text);
@@ -174,21 +203,8 @@ export default function Plan({ convId, cfg, notify, demo }: { convId: string | n
       {/* the form */}
       <form className="mt-6 rounded-3xl border border-ink/10 bg-white p-5 md:p-7" onSubmit={(e) => { e.preventDefault(); generate(); }}>
         <div className="grid gap-5 md:grid-cols-2">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold">From</span>
-            <select className={fieldCls("origin")} value={trip.origin ?? ""} onChange={(e) => set({ origin: e.target.value })}>
-              {ORIGINS.map((o) => <option key={o.code} value={o.code}>{o.name}</option>)}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold">To</span>
-            <select className={fieldCls("destination")} value={trip.destination ?? ""} onChange={(e) => set({ destination: e.target.value })}>
-              <option value="" disabled>Choose your town</option>
-              {DESTINATIONS.map((g) => (
-                <optgroup key={g.group} label={g.group}>{g.items.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</optgroup>
-              ))}
-            </select>
-          </label>
+          <PlaceInput id="from" label="From" value={trip.origin} placeholder="City, town or village" className={fieldCls("origin")} onChange={(v) => set({ origin: v })} />
+          <PlaceInput id="to" label="To" value={trip.destination} placeholder="e.g. Gonda, Shimla, Madhubani" className={fieldCls("destination")} onChange={(v) => set({ destination: v })} />
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold">Around which date?</span>
             <input type="date" min={isoToday()} className={fieldCls("date")} value={trip.date ?? ""} onChange={(e) => set({ date: e.target.value })} />
@@ -248,6 +264,11 @@ export default function Plan({ convId, cfg, notify, demo }: { convId: string | n
                   onWatch={async () => { if (!convId) return; try { setWatch(await api.watchFare(convId, fare.advice.currentFare)); notify("Watching this fare. We'll alert you here" + (waLinked ? " and on WhatsApp." : ".")); } catch (e) { notify(String(e)); } }}
                   onSimulateDrop={() => convId && api.simulateDrop(convId).then(() => api.getWatch(convId).then(setWatch))} />
               </div>
+            )}
+            {plan.notes?.length > 0 && (
+              <ul className="rise space-y-1 rounded-2xl bg-sand/70 px-4 py-3 text-sm text-ink/80">
+                {plan.notes.map((n: string) => <li key={n}>{n}</li>)}
+              </ul>
             )}
             <div className="rise" style={{ animationDelay: "120ms" }}><Itineraries card={plan} /></div>
             {cfg?.whatsapp && !waLinked && (

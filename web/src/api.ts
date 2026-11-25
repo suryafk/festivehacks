@@ -25,6 +25,7 @@ export interface CabMates {
   towns: { code: string; name: string; lat: number; lng: number; count: number; compatible: boolean }[];
   pool: { request: { status: string; pool_id: string | null; id: string }; pool: (Split & { members: { id: string; name: string; town: string }[] }) | null } | null;
 }
+export interface PlaceSuggestion { code: string; name: string; detail: string }
 export type Config = { voiceInput: boolean; judgeControls: boolean; whatsapp: boolean; festiveRush: boolean; sponsors: Record<string, boolean>; sandbox: { number: string; join: string } };
 
 const json = async <T,>(r: Response): Promise<T> => {
@@ -39,7 +40,8 @@ export const api = {
   get: (id: string) => fetch(`/api/conversations/${id}`).then(json<{ id: string; name: string; stage: string; trip: Trip; messages: Msg[]; whatsapp: boolean }>),
   send: (id: string, body: { text?: string; action?: unknown; wasVoice?: boolean; voiceLang?: string }) => post<Reply>(`/api/conversations/${id}/message`, body),
   plan: (id: string, trip: Trip) => post<Reply>(`/api/conversations/${id}/message`, { action: { type: "set_trip", trip } }),
-  parse: (id: string, text: string) => post<Trip & { lang: string; unknownPlaces?: string[]; message?: string }>(`/api/conversations/${id}/parse`, { text }),
+  parse: (id: string, text: string) => post<Trip & { lang: string; unknownPlaces?: string[]; message?: string; names?: Record<string, string> }>(`/api/conversations/${id}/parse`, { text }),
+  places: (q: string) => fetch(`/api/places?q=${encodeURIComponent(q)}`).then(json<PlaceSuggestion[]>),
   voice: (id: string, blob: Blob) => {
     const f = new FormData();
     f.append("audio", blob, blob.type.includes("ogg") ? "voice.ogg" : "voice.webm");
@@ -72,7 +74,10 @@ export const DESTINATIONS = [
   { group: "Bihar (via Patna)", items: [["CPR", "Chhapra"], ["ARA", "Ara"], ["BGS", "Begusarai"], ["HJP", "Hajipur"], ["PAT", "Patna"]] },
   { group: "Purvanchal (via Varanasi)", items: [["JNU", "Jaunpur"], ["GZP", "Ghazipur"], ["MZP", "Mirzapur"], ["VNS", "Varanasi"]] },
 ];
+/** Code → name. Starts with the seed; the server sends names for every other place a plan mentions. */
 export const CITY: Record<string, string> = Object.fromEntries([...ORIGINS.map((o) => [o.code, o.name]), ...DESTINATIONS.flatMap((g) => g.items)]);
+export const registerNames = (names?: Record<string, string> | null) => { if (names) Object.assign(CITY, names); };
+/** A code shows its name; free text (a place typed in the form, not looked up yet) shows as typed. */
 export const city = (c?: string) => (c ? CITY[c] ?? c : "");
 export const time = (ms: number) => new Date(ms).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" });
 export const day = (ms: number | string) => new Date(typeof ms === "string" ? ms + "T00:00:00+05:30" : ms).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });

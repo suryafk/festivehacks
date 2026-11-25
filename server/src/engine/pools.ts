@@ -1,7 +1,7 @@
 // Pool requests: created by the engine, claimed + matched by watcher pods, results applied here.
 import { db, uid, j, convs } from "../db.ts";
 import { pushToConv, trace } from "../bus.ts";
-import { seedRiders, cityByCode } from "./seed.ts";
+import { seedRiders, cityByCode, type City } from "./seed.ts";
 import { splitFare, type Rider, type SplitWeights, compatible } from "./pooling.ts";
 import { t, langKey } from "./i18n.ts";
 import { sendWhatsApp } from "../integrations/whatsapp.ts";
@@ -23,12 +23,23 @@ interface Row {
 
 const toRider = (r: Row): Rider => ({ id: r.id, name: r.name, hub: r.hub, town: r.town, arriveAt: r.arrive_at, dropKm: r.drop_km });
 
-export function ensureSeedRiders(hub: string, arriveAt: number) {
+// Simulated co-travellers for airports outside the hand-made seed: a few people heading to the same town.
+const EXTRA = [
+  { name: "Ravi", arriveOffsetMin: 20, kmDelta: 0 },
+  { name: "Sunita", arriveOffsetMin: -30, kmDelta: -15 },
+  { name: "Karan", arriveOffsetMin: 50, kmDelta: 10 },
+];
+
+export function ensureSeedRiders(hub: string, arriveAt: number, town?: string, km?: number) {
   // Keep every seeded traveller "around" this arrival time (refills after they get matched, so each visitor sees a lively map).
   const has = db.prepare("SELECT 1 FROM pool_requests WHERE synthetic = 1 AND hub = ? AND name = ? AND status = 'waiting' AND ABS(arrive_at - ?) < 10800000");
   const ins = db.prepare("INSERT INTO pool_requests (id, conv_id, name, hub, town, arrive_at, drop_km, synthetic, created) VALUES (?,?,?,?,?,?,?,1,?)");
-  for (const s of seedRiders.filter((s) => s.hub === hub))
+  const seeded = seedRiders.filter((s) => s.hub === hub);
+  for (const s of seeded)
     if (!has.get(hub, s.name, arriveAt)) ins.run(uid(), null, s.name, s.hub, s.to, arriveAt + s.arriveOffsetMin * 60_000, s.dropKm, Date.now());
+  if (!seeded.length && town && km)
+    for (const x of EXTRA)
+      if (!has.get(hub, x.name, arriveAt)) ins.run(uid(), null, x.name, hub, town, arriveAt + x.arriveOffsetMin * 60_000, Math.max(10, km + x.kmDelta), Date.now());
 }
 
 export function waitingNear(hub: string, arriveAt: number, windowMin: number): Row[] {
@@ -68,7 +79,7 @@ export function claim(pod: string, n: number, leaseMs: number) {
   const rows = db.prepare("SELECT * FROM pool_requests WHERE status = 'waiting' AND synthetic != 1 AND claimed_until < ? ORDER BY created LIMIT ?").all(now, n) as unknown as Row[];
   const upd = db.prepare("UPDATE pool_requests SET claimed_by = ?, claimed_until = ? WHERE id = ? AND claimed_until < ?");
   const claimed = rows.filter((r) => Number(upd.run(pod, now + leaseMs, r.id, now).changes) === 1);
-  return claimed.map((r) => ({
+  const jobs = claimed.map((r) => ({
     request: toRider(r),
     candidates: waitingNear(r.hub, r.arrive_at, 120)
       .filter((c) => c.id !== r.id)
@@ -76,6 +87,10 @@ export function claim(pod: string, n: number, leaseMs: number) {
       .slice(0, 300)
       .map(toRider),
   }));
+  // Watcher pods have no database: send the places these jobs mention (airports, looked-up towns) along.
+  const codes = new Set(jobs.flatMap((j) => [j.request, ...j.candidates].flatMap((x) => [x.hub, x.town])));
+  const places = [...codes].map((c) => cityByCode.get(c)).filter((c): c is City => Boolean(c));
+  return { jobs, places };
 }
 
 export async function applyResult(requestId: string, memberIds: string[], w: SplitWeights, pod: string) {

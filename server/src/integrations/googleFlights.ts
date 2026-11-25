@@ -98,11 +98,18 @@ export async function getLiveFares(from: string, to: string, date: string, convI
   });
   const t0 = performance.now();
   try {
-    const res = await fetch(`${process.env.SERPAPI_BASE ?? "https://serpapi.com"}/search.json?${q}`, { signal: AbortSignal.timeout(20_000) });
+    const url = `${process.env.SERPAPI_BASE ?? "https://serpapi.com"}/search.json?${q}`;
+    // one retry on a dropped connection (not on an API error, which would just spend another search)
+    const res = await fetch(url, { signal: AbortSignal.timeout(20_000) }).catch(async (e) => {
+      if (!/fetch failed|ECONNRESET|EAI_AGAIN/i.test(String(e))) throw e;
+      await new Promise((r) => setTimeout(r, 800));
+      return fetch(url, { signal: AbortSignal.timeout(20_000) });
+    });
     const j = (await res.json()) as any;
-    if (!res.ok || j?.error) throw new Error(String(j?.error ?? `HTTP ${res.status}`).slice(0, 200));
-    const parsed = parseSerpApi(j);
-    if (!parsed.flights.length) throw new Error("no flights in response");
+    // "Google Flights hasn't returned any results": a real answer (no flights on this route), not an outage.
+    const noResults = /hasn't returned any results|no results/i.test(String(j?.error ?? ""));
+    if ((!res.ok || j?.error) && !noResults) throw new Error(String(j?.error ?? `HTTP ${res.status}`).slice(0, 200));
+    const parsed = noResults ? { flights: [], insights: { history: [] } } : parseSerpApi(j);
     db.prepare("INSERT INTO fare_cache (k, ts, data) VALUES (?,?,?) ON CONFLICT(k) DO UPDATE SET ts = excluded.ts, data = excluded.data").run(k, Date.now(), JSON.stringify(parsed));
     trace("flights", convId, {
       api: "google_flights", route: `${from}→${to}`, date, ms: Math.round(performance.now() - t0),

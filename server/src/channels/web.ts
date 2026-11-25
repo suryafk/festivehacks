@@ -10,6 +10,7 @@ import { poolOf, ensureSeedRiders, waitingNear } from "../engine/pools.ts";
 import { extractIntent } from "../engine/intent.ts";
 import { createWatch, getWatch, simulateDrop } from "../engine/fareWatch.ts";
 import { cityByCode } from "../engine/seed.ts";
+import { resolvePlace, suggestPlaces, namesFor } from "../engine/places.ts";
 import { compatible } from "../engine/pooling.ts";
 import { rushKnobs } from "../integrations/flags.ts";
 import type { Itinerary, Trip } from "../engine/planner.ts";
@@ -113,9 +114,28 @@ export function webRoutes(app: FastifyInstance) {
     if (!text?.trim()) return reply.code(400).send({ error: "empty" });
     const current = j<Trip>(conv.trip, {});
     const intent = await extractIntent(text.slice(0, 500), current, new Date(), conv.id);
-    const unknownPlaces = intent.unknownPlaces ?? [];
-    const message = unknownPlaces.length ? t.notCovered(intent.lang?.startsWith("hi") ? "hi" : "en", unknownPlaces) : undefined;
-    return { origin: intent.origin, destination: intent.destination, date: intent.date, flexDays: intent.flexDays, modes: intent.modes, travellers: intent.travellers, lang: intent.lang, unknownPlaces, message };
+    // free-text names (Shimla, a village) → looked up on OpenStreetMap so the form shows a real place
+    const missing: string[] = [];
+    const failed: string[] = [];
+    const abroad = [...(intent.unknownPlaces ?? [])];
+    for (const [k, nk] of [["origin", "originName"], ["destination", "destinationName"]] as const) {
+      if (intent[k] || !intent[nk]) continue;
+      const r = await resolvePlace(intent[nk]!, conv.id);
+      if (r.ok) intent[k] = r.city.code;
+      else (r.reason === "abroad" ? abroad : r.reason === "lookup_failed" ? failed : missing).push(r.name);
+    }
+    const l = intent.lang?.startsWith("hi") ? "hi" : "en";
+    const message = abroad.length || missing.length || failed.length ? t.placeProblem(l, abroad, missing, failed) : undefined;
+    return {
+      origin: intent.origin, destination: intent.destination, date: intent.date, flexDays: intent.flexDays, modes: intent.modes, travellers: intent.travellers,
+      lang: intent.lang, unknownPlaces: [...abroad, ...missing, ...failed], message, names: namesFor([intent.origin, intent.destination]),
+    };
+  });
+
+  // Type-ahead for From / To (local list only: seed places, airports, places looked up before).
+  app.get("/api/places", async (req) => {
+    const { q } = (req.query ?? {}) as { q?: string };
+    return suggestPlaces(String(q ?? "").slice(0, 40));
   });
 
   // Cab-mates map: who else lands at my hub around my time, and where they're headed.
@@ -128,7 +148,7 @@ export function webRoutes(app: FastifyInstance) {
     const p = it.pool;
     const f = await getFlags(conv.user_ref ?? conv.id);
     const w = { ...f.split_weights, windowMin: rushKnobs(f).poolWindowMin };
-    ensureSeedRiders(p.hub, p.arriveAt);
+    ensureSeedRiders(p.hub, p.arriveAt, p.town, p.km);
     const me = { id: "__me", name: conv.name ?? "You", hub: p.hub, town: p.town, arriveAt: p.arriveAt, dropKm: p.km };
     const mine = poolOf(conv.id);
     const riders = waitingNear(p.hub, p.arriveAt, 180)

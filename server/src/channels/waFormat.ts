@@ -58,7 +58,10 @@ const W = {
   },
 };
 
-const LABEL_HI: Record<string, string> = { "Direct flight": "सीधी फ्लाइट", "Flight + train": "फ्लाइट + ट्रेन", "Flight + cab": "फ्लाइट + कैब", "Direct train": "सीधी ट्रेन", "Train + train": "ट्रेन + ट्रेन" };
+const LABEL_HI: Record<string, string> = {
+  "Direct flight": "सीधी फ्लाइट", "Flight + train": "फ्लाइट + ट्रेन", "Flight + cab": "फ्लाइट + कैब", "Direct train": "सीधी ट्रेन", "Train + train": "ट्रेन + ट्रेन",
+  "Cab + flight": "कैब + फ्लाइट", "Cab + flight + train": "कैब + फ्लाइट + ट्रेन", "Cab + flight + cab": "कैब + फ्लाइट + कैब", "Cab all the way": "पूरा रास्ता कैब से",
+};
 const LEVEL_HI: Record<string, string> = { low: "कम", typical: "सामान्य", high: "ज़्यादा" };
 const label = (s: string, l: L) => (l === "hi" ? LABEL_HI[s] ?? s : s);
 const ICON: Record<string, string> = { flight: "✈️", train: "🚆", cab: "🚕", transfer: "🚶" };
